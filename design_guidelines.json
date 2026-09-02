@@ -1,0 +1,162 @@
+{
+  "app_name": "Immortality \u2014 Dao Longevity",
+  "personality": "8 Hand-Drawn / Journal LIGHT with 3 Editorial structure fusion",
+  "personality_one_liner": "A calm, grounded journey map and journal that feels like unrolling a contemplative ancient scroll\u2014where empty space speaks as loudly as ink.",
+  "color": {
+    "surface": "#F7F5F0",
+    "onSurface": "#1A1918",
+    "surfaceSecondary": "#EFEBE0",
+    "onSurfaceSecondary": "#3D3B38",
+    "surfaceTertiary": "#E4DFD0",
+    "onSurfaceTertiary": "#2E2D2A",
+    "surfaceInverse": "#1A1918",
+    "onSurfaceInverse": "#F7F5F0",
+    "brand": "#5E6C58",
+    "brandPrimary": "#5E6C58",
+    "onBrandPrimary": "#F7F5F0",
+    "brandSecondary": "#8C7A6B",
+    "onBrandSecondary": "#F7F5F0",
+    "brandTertiary": "#D9D4C7",
+    "onBrandTertiary": "#1A1918",
+    "success": "#6E7A65",
+    "onSuccess": "#FFFFFF",
+    "warning": "#B59969",
+    "onWarning": "#FFFFFF",
+    "error": "#9E6759",
+    "onError": "#FFFFFF",
+    "info": "#6A7B82",
+    "onInfo": "#FFFFFF",
+    "border": "#DCD7CC",
+    "borderStrong": "#B8B1A4",
+    "divider": "#E6E2D8"
+  },
+  "typography": {
+    "displayFontFamily": "Cormorant Garamond",
+    "textFontFamily": "DM Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Handle spacing correctly dont have extra spaces where its not required, handle padding and margin corectly and subtle for buttons and components",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "0",
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": "false",
+    "do's": [
+      "Use solid surfaceSecondary or subtle semi-transparent background tints layered organically instead of Apple-style frosted glass.",
+      "Use gradient fades (surface to transparent) to mimic natural mist at scroll edges."
+    ],
+    "dont's": [
+      "No heavy Apple-style blur over content, which breaks the organic scroll aesthetic.",
+      "Never blur text inputs, cards, or journal bodies."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Onboarding",
+      "purpose": "Set intentions (What draws you to longevity?) and choose path (Dao/Ayurveda/Both), introducing the calm ink-wash vibe.",
+      "states": {
+        "loading": "Centered soft fade loading indicator.",
+        "empty": "N/A",
+        "error": "Gentle error text 'The path is clouded. Try again.' with a subtle retry button."
+      },
+      "layout": "Full-bleed scroll texture background with a vertical gradient scrim. Editorial typography centrally aligned. Large touch targets (pill buttons) for path selection, maintaining massive negative space."
+    },
+    {
+      "name": "Path (Home)",
+      "purpose": "A 12-month visual progression journey map tracking the user's Dao/Ayurveda progress.",
+      "states": {
+        "loading": "Skeleton nodes fading in and out subtly.",
+        "empty": "Illustration of an unstarted path with a gentle prompt to begin.",
+        "error": "Readable charcoal text 'Unable to trace the path' and a retry button."
+      },
+      "layout": "Organic visual timeline. Nodes are staggered left and right across a subtle center line, acting as stepping stones rather than a rigid vertical checklist. Top hero uses a nature/bamboo background photo with gradient-to-dark scrim."
+    },
+    {
+      "name": "Practice Library",
+      "purpose": "A structured but peaceful archive to browse and filter practices by tradition and difficulty.",
+      "states": {
+        "loading": "Skeleton cards in a 2-column grid.",
+        "empty": "A soft ink-wash empty state illustration saying 'No practices found for this filter.'",
+        "error": "Error message with a retry button."
+      },
+      "layout": "Hero image at the top. Sticky filter row (scrollable chips for Dao, Ayurveda, Difficulty) just below the header. Below filters, 2-column grid of cards using width: (screenWidth - 2*padding - gap)/2. Cards have surfaceSecondary backgrounds, no shadows."
+    },
+    {
+      "name": "Journal",
+      "purpose": "Daily/Weekly reflection logging that feels like a personal diary, encouraging 'nothing happened' as a valid entry.",
+      "states": {
+        "loading": "Spinner in the center.",
+        "empty": "A prominent but gentle 'Begin today's reflection' button surrounded by ample whitespace.",
+        "error": "Simple retry block."
+      },
+      "layout": "Minimalist paper-like UI. The 'Nothing happened today' is a first-class primary quick-action CTA at the bottom. Stacks of previous entries look like pinned notes or paragraphs separated by thin, torn-edge dividers."
+    },
+    {
+      "name": "Community & Profile",
+      "purpose": "Intimate profile showing streaks, the 'Elder' milestone badge, and a quiet feed of shared public logs.",
+      "states": {
+        "loading": "Subtle loading spinner.",
+        "empty": "Message: 'The community is resting. Share your first log.'",
+        "error": "Simple retry block."
+      },
+      "layout": "Top section is the personal profile banner (Zen garden background) highlighting Streaks and Badges with elegant serif typography. Bottom half is a single-column feed of public community logs separated by subtle dividers, emphasizing text and thought over social metrics."
+    }
+  ],
+  "images": {
+    "path_hero": {
+      "url": "https://images.unsplash.com/photo-1768232553319-00e3d669b1f6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxiYW1ib28lMjBmb3Jlc3QlMjBwYXRoJTIwY2FsbSUyMG1pc3QlMjBuYXR1cmV8ZW58MHx8fHwxNzg4MzcyNjg0fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "A path through a dense bamboo forest"
+    },
+    "onboarding_bg": {
+      "url": "https://images.unsplash.com/photo-1695041712957-45634f4fa759?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwxfHxibGFuayUyMGFuY2llbnQlMjBwYXBlciUyMHNjcm9sbCUyMHRleHR1cmUlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4ODM3MjY4NHww&ixlib=rb-4.1.0&q=85",
+      "alt": "A sheet of off-white paper with a horizontal crease across the middle"
+    },
+    "profile_hero": {
+      "url": "https://images.pexels.com/photos/35298174/pexels-photo-35298174.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "Peaceful Zen garden scene featuring raked sand patterns around dark stones, evoking tranquility."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Execute a Hand-Drawn/Journal LIGHT personality mixed with Editorial typography. Ensure 'Cormorant Garamond' is used for display headers to mimic an ancient scroll, and 'DM Sans' for readability on body texts.",
+    "Implement the 'journey map' visually on the Path screen by staggering items organically (e.g., alternating left and right alignments) down the center, connected by a subtle vertical line, rather than a rigid flat list.",
+    "Enforce emptiness (Xushi) as a core aesthetic. Use generous `xl`/`2xl` padding around text and cards. Do not pack the screen; let the UI breathe like an uncluttered diary page.",
+    "For the Journal screen, ensure the 'Nothing happened today' entry is a prominent, first-class quick-action button, reducing the friction of daily logging.",
+    "Images with overlaid text MUST implement the strict gradient-to-dark scrim pattern (Layer 0 image, Layer 1 linear-gradient from transparent to >=70% surfaceInverse, Layer 2 text).",
+    "Avoid pure black. Use the provided `surfaceInverse` (#1A1918) for deep charcoal ink tones to maintain the softer, layered feel of ink.",
+    "Warnings on practices should be brief, contextual one-liners using the 'warning' token color (#B59969), directly inside the scroll flow. Absolutely NO popup walls or full-screen blocks.",
+    "Maintain a calm, intimate feel for the Community feed by removing heavy social metrics (no prominent like counts/engagement farming). Use single-column text-focused layouts separated by subtle dividers."
+  ]
+}

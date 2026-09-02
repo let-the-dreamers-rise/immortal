@@ -1,0 +1,48 @@
+# Immortality — Dao Longevity · PRD
+
+## Problem Statement
+A mobile app for people who want to live longer to explore ancient longevity practices
+(Chinese Dao + Ayurveda), follow a structured guided path, log their journey like a journal,
+and build a real-world community — framed strictly as historical exploration, not medical advice.
+
+## Architecture
+- Frontend: React Native (Expo Router, TS). Fonts: Cormorant Garamond (display) + DM Sans (body).
+  Icons: phosphor-react-native. Keyboard: react-native-keyboard-controller. Storage: @/src/utils/storage.
+- Backend: FastAPI + MongoDB (motor). Session-token auth in `user_sessions`.
+- Integrations: Emergent Google OAuth (unified with email auth), Gemini Nano Banana
+  (ink-wash illustrations), Emergent Object Storage (illustration images).
+
+## User Personas
+- The everyday seeker: curious about longevity, not a scholar; wants clear "what to do today".
+- The consistent practitioner: shows up daily, earns Elder status over time.
+
+## Core Requirements (static)
+- Guided Dao Path with honest, non-gamified progression.
+- Journaling where "nothing happened" is first-class.
+- Contextual one-line safety notes, one-time signup disclaimer, never popup walls.
+- Community that feels intimate, not social-media noise.
+
+## Implemented (2026-06)
+- Auth: email/password register+login (session token), Emergent Google login, /me, logout, profile edit.
+- Onboarding: intention prompt + path choice (Dao/Ayurveda/Both); one-time disclaimer on auth screen.
+- Dao Path Year 1: 4 stages as a staggered journey map; start + self-assessment unlock (min check-ins).
+- Practice Library: 20 curated practices (12 Dao, 8 Ayurveda); filters by tradition & difficulty;
+  historical-context vs modern-understanding labels; contextual safety notes; AI ink-wash illustrations
+  (8 generated, rest use gradient placeholders — LLM key budget cap hit; auto-resumes on top-up/restart).
+- Journal: free-form reflection + mood + practice/stage link + public/private; "Nothing happened today"
+  quick action; timeline with soft-delete; stage check-in increments.
+- Stats: current/longest streak, days practiced, milestones (7/30/90/365), Elder badge, stages completed.
+- Community: practitioners list, follow/unfollow, public feed, other-user profiles, personal profile banner.
+- Testing: 28/28 backend pytest pass; frontend e2e verified.
+
+## Backlog / Remaining
+- P1: Meetups & discovery (location opt-in, RSVP, liability waiver, Google Maps).
+- P1: Push notifications (daily reminders, replies) — requires deployed build + Firebase google-services.json.
+- P1: Community feed comments/reactions; moderation queue for user-submitted practices.
+- P2: Dao Path Year 2 (Months 13-24); expanded Ayurveda guided path.
+- P2: Aggregated practice insights; Chinese-language support.
+- Tech: add `authReady` flag to defer gated-screen fetches until session restore (avoids 401 flash on hard reload).
+
+## Notes
+- No payments in v1. Human-curated content (no AI recommendations) to maintain trust.
+- LLM illustration budget on the shared universal key is capped; top up to generate remaining images.

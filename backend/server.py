@@ -1,0 +1,788 @@
+"""Immortality — Dao Longevity backend.
+
+FastAPI + MongoDB. JWT/session auth (email+password) with optional Emergent
+Google login, the guided Dao Path, a curated practice library with AI-generated
+ink-wash illustrations (stored in Emergent Object Storage), and a journaling +
+lightweight community-following layer.
+"""
+
+import asyncio
+import base64
+import logging
+import os
+import secrets
+import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import List, Optional
+
+import bcrypt
+import httpx
+import requests
+from dotenv import load_dotenv
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Response
+from fastapi.concurrency import run_in_threadpool
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, EmailStr, Field
+from starlette.middleware.cors import CORSMiddleware
+
+from seed_data import (
+    ILLUSTRATION_STYLE,
+    PRACTICE_ILLUSTRATION_SUBJECT,
+    PRACTICES,
+    STAGES,
+)
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / ".env")
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("immortality")
+
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+mongo_url = os.environ["MONGO_URL"]
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ["DB_NAME"]]
+
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+SESSION_TTL_DAYS = 30
+
+# ---------------------------------------------------------------------------
+# Object storage
+# ---------------------------------------------------------------------------
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+APP_NAME = "immortality-dao"
+_storage_key: Optional[str] = None
+
+
+def init_storage() -> Optional[str]:
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    try:
+        resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+        resp.raise_for_status()
+        _storage_key = resp.json()["storage_key"]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("storage init failed: %s", e)
+        return None
+    return _storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data,
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_object(path: str) -> tuple[bytes, str]:
+    global _storage_key
+    key = init_storage()
+    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    if resp.status_code == 503:
+        _storage_key = None
+        key = init_storage()
+        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
+app = FastAPI(title="Immortality — Dao Longevity")
+api = APIRouter(prefix="/api")
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(pw: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(pw.encode(), hashed.encode())
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def new_user_id() -> str:
+    return "user_" + uuid.uuid4().hex[:12]
+
+
+def public_user(u: dict) -> dict:
+    return {
+        "user_id": u["user_id"],
+        "display_name": u.get("display_name"),
+        "picture": u.get("picture"),
+        "intention": u.get("intention"),
+        "path_choice": u.get("path_choice"),
+        "bio": u.get("bio"),
+        "onboarded": u.get("onboarded", False),
+        "created_at": u.get("created_at"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Auth models
+# ---------------------------------------------------------------------------
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    display_name: str = Field(min_length=2, max_length=40)
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class SessionIn(BaseModel):
+    session_id: str
+
+
+class OnboardingIn(BaseModel):
+    intention: str
+    path_choice: str  # dao | ayurveda | both
+
+
+class ProfileIn(BaseModel):
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+
+
+async def create_session(user_id: str) -> str:
+    token = secrets.token_urlsafe(32)
+    await db.user_sessions.insert_one(
+        {
+            "session_token": token,
+            "user_id": user_id,
+            "created_at": now_utc(),
+            "expires_at": now_utc() + timedelta(days=SESSION_TTL_DAYS),
+        }
+    )
+    return token
+
+
+async def get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.split(" ", 1)[1].strip()
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    exp = session["expires_at"]
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < now_utc():
+        raise HTTPException(status_code=401, detail="Session expired")
+    user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+# ---------------------------------------------------------------------------
+# Auth routes
+# ---------------------------------------------------------------------------
+@api.post("/auth/register")
+async def register(body: RegisterIn):
+    email = body.email.lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+    user = {
+        "user_id": new_user_id(),
+        "email": email,
+        "display_name": body.display_name.strip(),
+        "hashed_password": hash_password(body.password),
+        "auth_provider": "email",
+        "picture": None,
+        "bio": None,
+        "intention": None,
+        "path_choice": None,
+        "onboarded": False,
+        "created_at": now_utc(),
+    }
+    await db.users.insert_one(user)
+    token = await create_session(user["user_id"])
+    return {"session_token": token, "user": public_user(user)}
+
+
+@api.post("/auth/login")
+async def login(body: LoginIn):
+    user = await db.users.find_one({"email": body.email.lower()})
+    if not user or not user.get("hashed_password") or not verify_password(body.password, user["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    token = await create_session(user["user_id"])
+    return {"session_token": token, "user": public_user(user)}
+
+
+@api.post("/auth/session")
+async def google_session(body: SessionIn):
+    async with httpx.AsyncClient(timeout=30) as hc:
+        resp = await hc.get(
+            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+            headers={"X-Session-ID": body.session_id},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    data = resp.json()
+    email = (data.get("email") or "").lower()
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        user = existing
+        if not user.get("picture") and data.get("picture"):
+            await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"picture": data.get("picture")}})
+            user["picture"] = data.get("picture")
+    else:
+        user = {
+            "user_id": new_user_id(),
+            "email": email,
+            "display_name": (data.get("name") or email.split("@")[0]).strip(),
+            "hashed_password": None,
+            "auth_provider": "google",
+            "picture": data.get("picture"),
+            "bio": None,
+            "intention": None,
+            "path_choice": None,
+            "onboarded": False,
+            "created_at": now_utc(),
+        }
+        await db.users.insert_one(user)
+    token = await create_session(user["user_id"])
+    return {"session_token": token, "user": public_user(user)}
+
+
+@api.get("/auth/me")
+async def me(user: dict = Depends(get_current_user)):
+    return {"user": public_user(user)}
+
+
+@api.post("/auth/logout")
+async def logout(authorization: Optional[str] = Header(default=None)):
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        await db.user_sessions.delete_one({"session_token": token})
+    return {"ok": True}
+
+
+@api.post("/auth/onboarding")
+async def onboarding(body: OnboardingIn, user: dict = Depends(get_current_user)):
+    if body.path_choice not in ("dao", "ayurveda", "both"):
+        raise HTTPException(status_code=400, detail="Invalid path choice")
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"intention": body.intention.strip(), "path_choice": body.path_choice, "onboarded": True}},
+    )
+    user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return {"user": public_user(user)}
+
+
+@api.patch("/profile")
+async def update_profile(body: ProfileIn, user: dict = Depends(get_current_user)):
+    updates = {}
+    if body.display_name is not None and body.display_name.strip():
+        updates["display_name"] = body.display_name.strip()[:40]
+    if body.bio is not None:
+        updates["bio"] = body.bio.strip()[:280]
+    if updates:
+        await db.users.update_one({"user_id": user["user_id"]}, {"$set": updates})
+    user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return {"user": public_user(user)}
+
+
+# ---------------------------------------------------------------------------
+# Practices
+# ---------------------------------------------------------------------------
+def illustration_url(practice_id: str) -> str:
+    return f"/api/illustrations/{practice_id}"
+
+
+@api.get("/practices")
+async def list_practices(tradition: Optional[str] = None, difficulty: Optional[str] = None):
+    q: dict = {"status": "approved"}
+    if tradition and tradition != "all":
+        q["tradition"] = tradition
+    if difficulty and difficulty != "all":
+        q["difficulty"] = difficulty
+    docs = await db.practices.find(q, {"_id": 0}).to_list(200)
+    docs.sort(key=lambda d: d.get("order", 999))
+    for d in docs:
+        d["illustration_url"] = illustration_url(d["practice_id"])
+        d["has_illustration"] = bool(d.get("illustration_path"))
+    return {"practices": docs}
+
+
+@api.get("/practices/{practice_id}")
+async def get_practice(practice_id: str):
+    d = await db.practices.find_one({"practice_id": practice_id}, {"_id": 0})
+    if not d:
+        raise HTTPException(status_code=404, detail="Practice not found")
+    d["illustration_url"] = illustration_url(d["practice_id"])
+    d["has_illustration"] = bool(d.get("illustration_path"))
+    return {"practice": d}
+
+
+@api.get("/illustrations/{practice_id}")
+async def serve_illustration(practice_id: str):
+    d = await db.practices.find_one({"practice_id": practice_id}, {"_id": 0, "illustration_path": 1})
+    if not d or not d.get("illustration_path"):
+        raise HTTPException(status_code=404, detail="No illustration yet")
+    try:
+        content, ctype = await run_in_threadpool(get_object, d["illustration_path"])
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=404, detail="Illustration unavailable")
+    return Response(content=content, media_type=ctype, headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ---------------------------------------------------------------------------
+# The Dao Path
+# ---------------------------------------------------------------------------
+async def get_progress_doc(user_id: str) -> dict:
+    doc = await db.path_progress.find_one({"user_id": user_id}, {"_id": 0})
+    if not doc:
+        doc = {"user_id": user_id, "stages": {}, "updated_at": now_utc()}
+        await db.path_progress.insert_one(dict(doc))
+    return doc
+
+
+def stage_status(order: int, progress: dict) -> dict:
+    stages = progress.get("stages", {})
+    key = str(order)
+    st = stages.get(key)
+    prev_complete = order == 1 or stages.get(str(order - 1), {}).get("completed", False)
+    if st and st.get("completed"):
+        state = "completed"
+    elif st and st.get("started_at"):
+        state = "in_progress"
+    elif prev_complete:
+        state = "available"
+    else:
+        state = "locked"
+    return {
+        "state": state,
+        "checkins": (st or {}).get("checkins", 0),
+        "started_at": (st or {}).get("started_at"),
+        "completed_at": (st or {}).get("completed_at"),
+    }
+
+
+@api.get("/path/stages")
+async def path_stages(user: dict = Depends(get_current_user)):
+    progress = await get_progress_doc(user["user_id"])
+    result = []
+    for s in sorted(STAGES, key=lambda x: x["order"]):
+        info = stage_status(s["order"], progress)
+        result.append(
+            {
+                "stage_id": s["stage_id"],
+                "order": s["order"],
+                "year": s["year"],
+                "months": s["months"],
+                "title": s["title"],
+                "chinese": s["chinese"],
+                "subtitle": s["subtitle"],
+                "recommended_days": s["recommended_days"],
+                "practice_count": len(s["practices"]),
+                **info,
+            }
+        )
+    return {"stages": result}
+
+
+@api.get("/path/stages/{order}")
+async def path_stage_detail(order: int, user: dict = Depends(get_current_user)):
+    s = next((x for x in STAGES if x["order"] == order), None)
+    if not s:
+        raise HTTPException(status_code=404, detail="Stage not found")
+    progress = await get_progress_doc(user["user_id"])
+    info = stage_status(order, progress)
+    practices = []
+    for pid in s["practices"]:
+        p = await db.practices.find_one({"practice_id": pid}, {"_id": 0})
+        if p:
+            p["illustration_url"] = illustration_url(pid)
+            p["has_illustration"] = bool(p.get("illustration_path"))
+            practices.append(p)
+    st = progress.get("stages", {}).get(str(order), {})
+    return {
+        "stage": {
+            **s,
+            **info,
+            "practices_full": practices,
+            "min_checkins": s["min_checkins"],
+            "self_assessment": st.get("self_assessment"),
+        }
+    }
+
+
+@api.post("/path/stages/{order}/start")
+async def start_stage(order: int, user: dict = Depends(get_current_user)):
+    s = next((x for x in STAGES if x["order"] == order), None)
+    if not s:
+        raise HTTPException(status_code=404, detail="Stage not found")
+    progress = await get_progress_doc(user["user_id"])
+    info = stage_status(order, progress)
+    if info["state"] == "locked":
+        raise HTTPException(status_code=403, detail="Complete the previous stage first")
+    key = f"stages.{order}"
+    existing = progress.get("stages", {}).get(str(order), {})
+    if not existing.get("started_at"):
+        await db.path_progress.update_one(
+            {"user_id": user["user_id"]},
+            {"$set": {f"{key}.started_at": now_utc(), f"{key}.checkins": existing.get("checkins", 0), "updated_at": now_utc()}},
+        )
+    return {"ok": True}
+
+
+class UnlockIn(BaseModel):
+    self_assessment: str  # "ready" | "more_time"
+
+
+@api.post("/path/stages/{order}/complete")
+async def complete_stage(order: int, body: UnlockIn, user: dict = Depends(get_current_user)):
+    s = next((x for x in STAGES if x["order"] == order), None)
+    if not s:
+        raise HTTPException(status_code=404, detail="Stage not found")
+    progress = await get_progress_doc(user["user_id"])
+    st = progress.get("stages", {}).get(str(order), {})
+    if not st.get("started_at"):
+        raise HTTPException(status_code=403, detail="Begin this stage first")
+    checkins = st.get("checkins", 0)
+    if body.self_assessment != "ready":
+        await db.path_progress.update_one(
+            {"user_id": user["user_id"]}, {"$set": {f"stages.{order}.self_assessment": "more_time"}}
+        )
+        return {"unlocked": False, "reason": "You chose to give this stage more time. There is no rush."}
+    if checkins < s["min_checkins"]:
+        return {
+            "unlocked": False,
+            "reason": f"Log at least {s['min_checkins']} check-ins on this stage before moving on. You have {checkins}.",
+        }
+    await db.path_progress.update_one(
+        {"user_id": user["user_id"]},
+        {
+            "$set": {
+                f"stages.{order}.completed": True,
+                f"stages.{order}.completed_at": now_utc(),
+                f"stages.{order}.self_assessment": "ready",
+                "updated_at": now_utc(),
+            }
+        },
+    )
+    return {"unlocked": True, "reason": "Stage complete. The next stage is open when you are."}
+
+
+# ---------------------------------------------------------------------------
+# Journal / logs
+# ---------------------------------------------------------------------------
+class LogIn(BaseModel):
+    body: Optional[str] = ""
+    mood: Optional[str] = None  # still | open | tired | restless | light
+    nothing_happened: bool = False
+    practice_ids: List[str] = []
+    stage_order: Optional[int] = None
+    visibility: str = "private"  # private | public
+
+
+async def bump_stage_checkin(user_id: str, stage_order: Optional[int]):
+    if stage_order is None:
+        return
+    progress = await get_progress_doc(user_id)
+    st = progress.get("stages", {}).get(str(stage_order), {})
+    if st.get("started_at"):
+        await db.path_progress.update_one(
+            {"user_id": user_id}, {"$inc": {f"stages.{stage_order}.checkins": 1}, "$set": {"updated_at": now_utc()}}
+        )
+
+
+@api.post("/logs")
+async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
+    if body.visibility not in ("private", "public"):
+        raise HTTPException(status_code=400, detail="Invalid visibility")
+    now = now_utc()
+    log = {
+        "log_id": "log_" + uuid.uuid4().hex[:12],
+        "user_id": user["user_id"],
+        "body": (body.body or "").strip(),
+        "mood": body.mood,
+        "nothing_happened": body.nothing_happened,
+        "practice_ids": body.practice_ids,
+        "stage_order": body.stage_order,
+        "visibility": body.visibility,
+        "created_at": now,
+        "date": now.strftime("%Y-%m-%d"),
+        "deleted_at": None,
+    }
+    await db.logs.insert_one(dict(log))
+    await bump_stage_checkin(user["user_id"], body.stage_order)
+    log.pop("deleted_at", None)
+    return {"log": log}
+
+
+async def enrich_logs(docs: List[dict]) -> List[dict]:
+    user_ids = list({d["user_id"] for d in docs})
+    users = {u["user_id"]: u async for u in db.users.find({"user_id": {"$in": user_ids}}, {"_id": 0})}
+    prac = {p["practice_id"]: p["title"] async for p in db.practices.find({}, {"_id": 0, "practice_id": 1, "title": 1})}
+    for d in docs:
+        u = users.get(d["user_id"], {})
+        d["author"] = {"user_id": d["user_id"], "display_name": u.get("display_name"), "picture": u.get("picture")}
+        d["practice_titles"] = [prac.get(pid) for pid in d.get("practice_ids", []) if prac.get(pid)]
+    return docs
+
+
+@api.get("/logs/me")
+async def my_logs(user: dict = Depends(get_current_user)):
+    docs = (
+        await db.logs.find({"user_id": user["user_id"], "deleted_at": None}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(300)
+    )
+    docs = await enrich_logs(docs)
+    return {"logs": docs}
+
+
+@api.get("/logs/feed")
+async def feed(user: dict = Depends(get_current_user)):
+    docs = (
+        await db.logs.find({"visibility": "public", "deleted_at": None}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(100)
+    )
+    docs = await enrich_logs(docs)
+    return {"logs": docs}
+
+
+@api.delete("/logs/{log_id}")
+async def delete_log(log_id: str, user: dict = Depends(get_current_user)):
+    res = await db.logs.update_one(
+        {"log_id": log_id, "user_id": user["user_id"]}, {"$set": {"deleted_at": now_utc()}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Log not found")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Stats / streaks / badges
+# ---------------------------------------------------------------------------
+MILESTONES = [7, 30, 90, 365]
+
+
+def compute_streaks(dates: List[str]) -> dict:
+    if not dates:
+        return {"current": 0, "longest": 0, "total_days": 0}
+    unique = sorted(set(dates))
+    dvals = [datetime.strptime(d, "%Y-%m-%d").date() for d in unique]
+    longest = 1
+    run = 1
+    for i in range(1, len(dvals)):
+        if (dvals[i] - dvals[i - 1]).days == 1:
+            run += 1
+            longest = max(longest, run)
+        else:
+            run = 1
+    today = now_utc().date()
+    current = 0
+    if dvals[-1] in (today, today - timedelta(days=1)):
+        current = 1
+        for i in range(len(dvals) - 1, 0, -1):
+            if (dvals[i] - dvals[i - 1]).days == 1:
+                current += 1
+            else:
+                break
+    return {"current": current, "longest": longest, "total_days": len(unique)}
+
+
+async def build_stats(user_id: str) -> dict:
+    logs = await db.logs.find({"user_id": user_id, "deleted_at": None}, {"_id": 0, "date": 1}).to_list(2000)
+    dates = [l["date"] for l in logs]
+    streaks = compute_streaks(dates)
+    total_logs = len(logs)
+    achieved = [m for m in MILESTONES if streaks["longest"] >= m or streaks["total_days"] >= m]
+    is_elder = streaks["longest"] >= 90 or streaks["total_days"] >= 108
+    return {
+        "streak_current": streaks["current"],
+        "streak_longest": streaks["longest"],
+        "total_days": streaks["total_days"],
+        "total_logs": total_logs,
+        "milestones": MILESTONES,
+        "milestones_achieved": achieved,
+        "is_elder": is_elder,
+    }
+
+
+@api.get("/stats/me")
+async def my_stats(user: dict = Depends(get_current_user)):
+    stats = await build_stats(user["user_id"])
+    progress = await get_progress_doc(user["user_id"])
+    completed = sum(1 for v in progress.get("stages", {}).values() if v.get("completed"))
+    stats["stages_completed"] = completed
+    stats["stages_total"] = len(STAGES)
+    return {"stats": stats}
+
+
+# ---------------------------------------------------------------------------
+# Community following
+# ---------------------------------------------------------------------------
+@api.get("/community/practitioners")
+async def practitioners(user: dict = Depends(get_current_user)):
+    users = (
+        await db.users.find({"onboarded": True, "user_id": {"$ne": user["user_id"]}}, {"_id": 0})
+        .limit(50)
+        .to_list(50)
+    )
+    following = {f["following_id"] async for f in db.follows.find({"follower_id": user["user_id"]}, {"_id": 0})}
+    out = []
+    for u in users:
+        stats = await build_stats(u["user_id"])
+        out.append(
+            {
+                **public_user(u),
+                "is_elder": stats["is_elder"],
+                "streak_longest": stats["streak_longest"],
+                "is_following": u["user_id"] in following,
+            }
+        )
+    out.sort(key=lambda x: (not x["is_elder"], -x["streak_longest"]))
+    return {"practitioners": out}
+
+
+@api.get("/community/users/{user_id}")
+async def user_profile(user_id: str, user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    stats = await build_stats(user_id)
+    followers = await db.follows.count_documents({"following_id": user_id})
+    following = await db.follows.count_documents({"follower_id": user_id})
+    is_following = bool(await db.follows.find_one({"follower_id": user["user_id"], "following_id": user_id}))
+    logs = (
+        await db.logs.find({"user_id": user_id, "visibility": "public", "deleted_at": None}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(50)
+    )
+    logs = await enrich_logs(logs)
+    return {
+        "profile": {**public_user(u), **stats, "followers": followers, "following": following, "is_following": is_following},
+        "logs": logs,
+    }
+
+
+@api.post("/community/users/{user_id}/follow")
+async def follow(user_id: str, user: dict = Depends(get_current_user)):
+    if user_id == user["user_id"]:
+        raise HTTPException(status_code=400, detail="You cannot follow yourself")
+    if not await db.users.find_one({"user_id": user_id}):
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.follows.update_one(
+        {"follower_id": user["user_id"], "following_id": user_id},
+        {"$setOnInsert": {"created_at": now_utc()}},
+        upsert=True,
+    )
+    return {"ok": True, "is_following": True}
+
+
+@api.delete("/community/users/{user_id}/follow")
+async def unfollow(user_id: str, user: dict = Depends(get_current_user)):
+    await db.follows.delete_one({"follower_id": user["user_id"], "following_id": user_id})
+    return {"ok": True, "is_following": False}
+
+
+@api.get("/")
+async def root():
+    return {"message": "Immortality — Dao Longevity API"}
+
+
+app.include_router(api)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ---------------------------------------------------------------------------
+# Seeding + illustration generation
+# ---------------------------------------------------------------------------
+async def seed_content():
+    for i, p in enumerate(PRACTICES):
+        existing = await db.practices.find_one({"practice_id": p["practice_id"]}, {"_id": 0})
+        doc = {**p, "order": i, "status": "approved"}
+        if existing:
+            doc["illustration_path"] = existing.get("illustration_path")
+            await db.practices.update_one({"practice_id": p["practice_id"]}, {"$set": doc})
+        else:
+            doc["illustration_path"] = None
+            await db.practices.insert_one(doc)
+    logger.info("Seeded %d practices", len(PRACTICES))
+
+
+async def generate_illustrations():
+    """Lazily generate ink-wash illustrations for practices missing one."""
+    if not EMERGENT_KEY:
+        return
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+    except Exception as e:  # noqa: BLE001
+        logger.warning("emergentintegrations unavailable: %s", e)
+        return
+    pending = await db.practices.find({"illustration_path": None}, {"_id": 0, "practice_id": 1}).to_list(100)
+    for p in pending:
+        pid = p["practice_id"]
+        subject = PRACTICE_ILLUSTRATION_SUBJECT.get(pid, "a calm meditative scene")
+        prompt = ILLUSTRATION_STYLE + subject
+        try:
+            chat = LlmChat(
+                api_key=EMERGENT_KEY,
+                session_id=f"illus-{pid}",
+                system_message="You generate calm ink-wash illustrations.",
+            )
+            chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+            _text, images = await chat.send_message_multimodal_response(UserMessage(text=prompt))
+            if not images:
+                logger.warning("No image returned for %s", pid)
+                continue
+            img = images[0]
+            data = base64.b64decode(img["data"])
+            path = f"{APP_NAME}/illustrations/{pid}.png"
+            await run_in_threadpool(put_object, path, data, img.get("mime_type", "image/png"))
+            await db.practices.update_one({"practice_id": pid}, {"$set": {"illustration_path": path}})
+            logger.info("Generated illustration for %s", pid)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Illustration generation failed for %s: %s", pid, e)
+        await asyncio.sleep(0.5)
+    logger.info("Illustration generation pass complete")
+
+
+@app.on_event("startup")
+async def on_startup():
+    await db.users.create_index("email", unique=True)
+    await db.users.create_index("user_id", unique=True)
+    await db.user_sessions.create_index("session_token", unique=True)
+    await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
+    await db.logs.create_index([("user_id", 1), ("created_at", -1)])
+    await db.follows.create_index([("follower_id", 1), ("following_id", 1)], unique=True)
+    await seed_content()
+    init_storage()
+    asyncio.create_task(generate_illustrations())
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    client.close()
