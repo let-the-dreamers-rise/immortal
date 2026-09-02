@@ -4,7 +4,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Crown, Flame, GearSix } from "phosphor-react-native";
+import { Crown, Flame, GearSix, ChatCircle, MapPin, CalendarBlank } from "phosphor-react-native";
+import * as Location from "expo-location";
 
 import { Avatar, Button, EmptyState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
@@ -39,18 +40,40 @@ type FeedLog = {
   created_at: string;
   author: { user_id: string; display_name: string; picture?: string | null };
   practice_titles: string[];
+  comment_count: number;
+};
+
+type Meetup = {
+  meetup_id: string;
+  title: string;
+  tradition: string;
+  location_name: string;
+  city: string;
+  starts_at: string;
+  attendees: number;
+  is_rsvped: boolean;
+  is_host: boolean;
+  distance_km: number | null;
 };
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  const [tab, setTab] = useState<"practitioners" | "feed">("practitioners");
+  const [tab, setTab] = useState<"practitioners" | "feed" | "meetups">("practitioners");
   const [stats, setStats] = useState<Stats | null>(null);
   const [people, setPeople] = useState<Practitioner[]>([]);
   const [feed, setFeed] = useState<FeedLog[]>([]);
+  const [meetups, setMeetups] = useState<Meetup[]>([]);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const loadMeetups = useCallback(async (c: { lat: number; lng: number } | null) => {
+    const qs = c ? `?lat=${c.lat}&lng=${c.lng}` : "";
+    const res = await apiFetch<{ meetups: Meetup[] }>(`/meetups${qs}`);
+    setMeetups(res.meetups);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -62,10 +85,29 @@ export default function CommunityScreen() {
       setStats(s.stats);
       setPeople(p.practitioners);
       setFeed(f.logs);
+      await loadMeetups(coords);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [coords, loadMeetups]);
+
+  const findNearby = async () => {
+    try {
+      const { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
+      let granted = status === "granted";
+      if (!granted && canAskAgain) {
+        const req = await Location.requestForegroundPermissionsAsync();
+        granted = req.status === "granted";
+      }
+      if (!granted) return;
+      const pos = await Location.getCurrentPositionAsync({});
+      const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setCoords(c);
+      await loadMeetups(c);
+    } catch {
+      // ignore
+    }
+  };
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -143,8 +185,9 @@ export default function CommunityScreen() {
 
           {/* Tabs */}
           <View style={styles.segment}>
-            <SegBtn label="Practitioners" active={tab === "practitioners"} onPress={() => setTab("practitioners")} testID="community-tab-practitioners" />
-            <SegBtn label="Shared Logs" active={tab === "feed"} onPress={() => setTab("feed")} testID="community-tab-feed" />
+            <SegBtn label="People" active={tab === "practitioners"} onPress={() => setTab("practitioners")} testID="community-tab-practitioners" />
+            <SegBtn label="Logs" active={tab === "feed"} onPress={() => setTab("feed")} testID="community-tab-feed" />
+            <SegBtn label="Meetups" active={tab === "meetups"} onPress={() => setTab("meetups")} testID="community-tab-meetups" />
           </View>
 
           {tab === "practitioners" ? (
@@ -181,35 +224,87 @@ export default function CommunityScreen() {
                 ))}
               </View>
             )
-          ) : feed.length === 0 ? (
-            <EmptyStateBlock title="The community is resting" body="Share a reflection publicly from your journal to start the conversation." />
+          ) : tab === "feed" ? (
+            feed.length === 0 ? (
+              <EmptyStateBlock title="The community is resting" body="Share a reflection publicly from your journal to start the conversation." />
+            ) : (
+              <View style={{ paddingHorizontal: spacing.xl }}>
+                {feed.map((l, i) => (
+                  <View key={l.log_id}>
+                    {i > 0 && <View style={styles.feedDivider} />}
+                    <Pressable style={styles.feedItem} onPress={() => router.push(`/log/${l.log_id}`)} testID={`feed-log-${l.log_id}`}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                        <Avatar name={l.author.display_name} uri={l.author.picture} size={32} />
+                        <Txt variant="label">{l.author.display_name}</Txt>
+                      </View>
+                      <Txt variant="body" style={{ marginTop: spacing.sm }}>
+                        {l.nothing_happened && !l.body ? "Nothing happened today — and that is part of it." : l.body}
+                      </Txt>
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.sm }}>
+                        {l.practice_titles.length > 0 ? (
+                          <Txt variant="caption" color={colors.brandPrimary} style={{ flex: 1 }}>
+                            {l.practice_titles.join(" · ")}
+                          </Txt>
+                        ) : <View style={{ flex: 1 }} />}
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <ChatCircle size={14} color={colors.muted} weight="regular" />
+                          <Txt variant="caption" style={{ marginLeft: 4 }}>
+                            {l.comment_count} {l.comment_count === 1 ? "reply" : "replies"}
+                          </Txt>
+                        </View>
+                      </View>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )
           ) : (
             <View style={{ paddingHorizontal: spacing.xl }}>
-              {feed.map((l, i) => (
-                <View key={l.log_id}>
-                  {i > 0 && <View style={styles.feedDivider} />}
-                  <Pressable style={styles.feedItem} onPress={() => router.push(`/user/${l.author.user_id}`)} testID={`feed-log-${l.log_id}`}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-                      <Avatar name={l.author.display_name} uri={l.author.picture} size={32} />
-                      <Txt variant="label">{l.author.display_name}</Txt>
+              <View style={styles.meetupActions}>
+                <Button label="Host a circle" onPress={() => router.push("/meetup/new")} testID="meetup-host-button" style={{ flex: 1 }} />
+                {!coords ? (
+                  <Button label="Near me" variant="secondary" small onPress={findNearby} testID="meetup-nearby-button" />
+                ) : null}
+              </View>
+              <Txt variant="caption" style={{ marginTop: spacing.md, marginBottom: spacing.md }}>
+                Public places only. Meet fellow practitioners in the real world.
+              </Txt>
+              {meetups.length === 0 ? (
+                <EmptyStateBlock title="No circles scheduled" body="Be the first to host a practice circle in your area." />
+              ) : (
+                meetups.map((m) => (
+                  <Pressable key={m.meetup_id} style={styles.meetupCard} onPress={() => router.push(`/meetup/${m.meetup_id}`)} testID={`meetup-${m.meetup_id}`}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <Txt variant="caption" color={colors.brandPrimary}>{m.tradition.toUpperCase()}</Txt>
+                      {m.is_rsvped ? <Txt variant="caption" color={colors.success}>GOING</Txt> : null}
                     </View>
-                    <Txt variant="body" style={{ marginTop: spacing.sm }}>
-                      {l.nothing_happened && !l.body ? "Nothing happened today — and that is part of it." : l.body}
-                    </Txt>
-                    {l.practice_titles.length > 0 ? (
-                      <Txt variant="caption" color={colors.brandPrimary} style={{ marginTop: spacing.sm }}>
-                        {l.practice_titles.join(" · ")}
+                    <Txt variant="title" style={{ fontSize: 19, marginTop: 2 }}>{m.title}</Txt>
+                    <View style={styles.meetupMeta}>
+                      <CalendarBlank size={13} color={colors.muted} weight="regular" />
+                      <Txt variant="caption" style={{ marginLeft: 4 }}>{formatMeetupDate(m.starts_at)}</Txt>
+                    </View>
+                    <View style={styles.meetupMeta}>
+                      <MapPin size={13} color={colors.muted} weight="regular" />
+                      <Txt variant="caption" style={{ marginLeft: 4, flex: 1 }} numberOfLines={1}>
+                        {m.location_name}, {m.city}{m.distance_km != null ? ` · ${m.distance_km} km` : ""}
                       </Txt>
-                    ) : null}
+                    </View>
+                    <Txt variant="caption" style={{ marginTop: spacing.sm }}>{m.attendees} going</Txt>
                   </Pressable>
-                </View>
-              ))}
+                ))
+              )}
             </View>
           )}
         </ScrollView>
       )}
     </View>
   );
+}
+
+function formatMeetupDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) +
+    " · " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 function Stat({ value, label, inverse }: { value: number | string; label: string; inverse?: boolean }) {
@@ -277,4 +372,14 @@ const styles = StyleSheet.create({
   personRow: { flexDirection: "row", alignItems: "center", paddingVertical: spacing.md },
   feedItem: { paddingVertical: spacing.md },
   feedDivider: { height: 1, backgroundColor: colors.divider },
+  meetupActions: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  meetupCard: {
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  meetupMeta: { flexDirection: "row", alignItems: "center", marginTop: spacing.xs },
 });

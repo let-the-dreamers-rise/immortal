@@ -97,7 +97,18 @@ export default function PathScreen() {
 
           <View style={styles.map}>
             {stages.map((s, i) => (
-              <StageNode key={s.order} stage={s} left={i % 2 === 0} onPress={() => router.push(`/stage/${s.order}`)} />
+              <View key={s.order}>
+                {i > 0 && s.year !== stages[i - 1].year ? (
+                  <View style={styles.yearBanner}>
+                    <View style={styles.yearLine} />
+                    <Txt variant="caption" color={colors.brandSecondary} style={{ marginHorizontal: spacing.md }}>
+                      YEAR {s.year} · INTERNAL WORK (內功)
+                    </Txt>
+                    <View style={styles.yearLine} />
+                  </View>
+                ) : null}
+                <StageNode stage={s} left={i % 2 === 0} onPress={() => router.push(`/stage/${s.order}`)} />
+              </View>
             ))}
           </View>
         </ScrollView>
@@ -184,6 +195,8 @@ const styles = StyleSheet.create({
   heroContent: { flex: 1, justifyContent: "flex-end", padding: spacing.lg },
   mapNote: { paddingHorizontal: spacing.xl, marginBottom: spacing.lg },
   map: { paddingHorizontal: spacing.xl },
+  yearBanner: { flexDirection: "row", alignItems: "center", paddingVertical: spacing.lg },
+  yearLine: { flex: 1, height: 1, backgroundColor: colors.border },
   row: { flexDirection: "row", alignItems: "center", minHeight: 128 },
   center: { width: CENTER, alignItems: "center", justifyContent: "center", alignSelf: "stretch" },
   line: { position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: colors.border },

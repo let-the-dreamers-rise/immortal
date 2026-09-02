@@ -112,9 +112,15 @@ class TestPath:
         r = api.get(f"{base_url}/api/path/stages", headers=seeker_headers)
         assert r.status_code == 200
         s = r.json()["stages"]
-        assert len(s) == 4
+        assert len(s) == 7
         assert s[0]["state"] in ("available", "in_progress", "completed")
         assert s[0]["order"] == 1
+        # Year 2 stages orders 5-7
+        assert {st["order"] for st in s if st["year"] == 2} == {5, 6, 7}
+        # Year 2 stages should be locked for seeker who has not completed Year 1
+        for st in s:
+            if st["order"] in (5, 6, 7):
+                assert st["state"] == "locked"
 
     def test_stage_detail(self, api, base_url, seeker_headers):
         r = api.get(f"{base_url}/api/path/stages/1", headers=seeker_headers)
@@ -229,7 +235,7 @@ class TestStats:
         s = r.json()["stats"]
         for k in ["streak_current", "streak_longest", "total_days", "total_logs", "milestones", "milestones_achieved", "is_elder", "stages_completed", "stages_total"]:
             assert k in s
-        assert s["stages_total"] == 4
+        assert s["stages_total"] == 7
 
 
 # ---------- Community ----------

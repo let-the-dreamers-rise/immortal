@@ -17,6 +17,7 @@ type Log = {
   visibility: string;
   created_at: string;
   practice_titles: string[];
+  comment_count: number;
 };
 
 const MOOD_LABEL: Record<string, string> = {
@@ -154,6 +155,13 @@ export default function JournalScreen() {
                         <Txt key={t} variant="caption" color={colors.brandPrimary}>· {t}</Txt>
                       ))}
                     </View>
+                    {l.visibility === "public" ? (
+                      <Pressable onPress={() => router.push(`/log/${l.log_id}`)} style={styles.repliesLink} testID={`journal-replies-${l.log_id}`}>
+                        <Txt variant="caption" color={colors.brandSecondary}>
+                          {l.comment_count > 0 ? `VIEW ${l.comment_count} REPL${l.comment_count === 1 ? "Y" : "IES"}` : "SHARED PUBLICLY · VIEW"}
+                        </Txt>
+                      </Pressable>
+                    ) : null}
                   </View>
                 </View>
               ))}
@@ -197,4 +205,5 @@ const styles = StyleSheet.create({
   entryHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   confirmRow: { flexDirection: "row", alignItems: "center", marginTop: spacing.sm, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, padding: spacing.md },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
+  repliesLink: { marginTop: spacing.sm },
 });

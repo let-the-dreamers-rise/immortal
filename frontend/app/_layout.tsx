@@ -48,7 +48,10 @@ function RootNavigator() {
       <Stack.Screen name="stage/[order]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="practice/[id]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="user/[id]" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="log/[id]" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="meetup/[id]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="log/new" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+      <Stack.Screen name="meetup/new" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
       <Stack.Screen name="settings" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
     </Stack>
   );

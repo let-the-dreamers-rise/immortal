@@ -131,6 +131,9 @@ def public_user(u: dict) -> dict:
         "path_choice": u.get("path_choice"),
         "bio": u.get("bio"),
         "onboarded": u.get("onboarded", False),
+        "reminder_enabled": u.get("reminder_enabled", False),
+        "reminder_hour": u.get("reminder_hour", 8),
+        "reminder_minute": u.get("reminder_minute", 0),
         "created_at": u.get("created_at"),
     }
 
@@ -534,12 +537,19 @@ async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
 
 async def enrich_logs(docs: List[dict]) -> List[dict]:
     user_ids = list({d["user_id"] for d in docs})
+    log_ids = [d["log_id"] for d in docs]
     users = {u["user_id"]: u async for u in db.users.find({"user_id": {"$in": user_ids}}, {"_id": 0})}
     prac = {p["practice_id"]: p["title"] async for p in db.practices.find({}, {"_id": 0, "practice_id": 1, "title": 1})}
+    counts: dict = {}
+    async for c in db.comments.aggregate(
+        [{"$match": {"log_id": {"$in": log_ids}, "deleted_at": None}}, {"$group": {"_id": "$log_id", "n": {"$sum": 1}}}]
+    ):
+        counts[c["_id"]] = c["n"]
     for d in docs:
         u = users.get(d["user_id"], {})
         d["author"] = {"user_id": d["user_id"], "display_name": u.get("display_name"), "picture": u.get("picture")}
         d["practice_titles"] = [prac.get(pid) for pid in d.get("practice_ids", []) if prac.get(pid)]
+        d["comment_count"] = counts.get(d["log_id"], 0)
     return docs
 
 
@@ -572,6 +582,231 @@ async def delete_log(log_id: str, user: dict = Depends(get_current_user)):
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Log not found")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Comments (replies on shared reflections)
+# ---------------------------------------------------------------------------
+class CommentIn(BaseModel):
+    body: str = Field(min_length=1, max_length=1000)
+
+
+async def enrich_comments(docs: List[dict]) -> List[dict]:
+    ids = list({d["user_id"] for d in docs})
+    users = {u["user_id"]: u async for u in db.users.find({"user_id": {"$in": ids}}, {"_id": 0})}
+    for d in docs:
+        u = users.get(d["user_id"], {})
+        d["author"] = {"user_id": d["user_id"], "display_name": u.get("display_name"), "picture": u.get("picture")}
+    return docs
+
+
+async def visible_log(log_id: str, user: dict) -> dict:
+    log = await db.logs.find_one({"log_id": log_id, "deleted_at": None}, {"_id": 0})
+    if not log:
+        raise HTTPException(status_code=404, detail="Reflection not found")
+    if log["visibility"] != "public" and log["user_id"] != user["user_id"]:
+        raise HTTPException(status_code=403, detail="This reflection is private")
+    return log
+
+
+@api.get("/logs/{log_id}")
+async def get_log(log_id: str, user: dict = Depends(get_current_user)):
+    log = await visible_log(log_id, user)
+    (log,) = await enrich_logs([log])
+    comments = (
+        await db.comments.find({"log_id": log_id, "deleted_at": None}, {"_id": 0}).sort("created_at", 1).to_list(300)
+    )
+    comments = await enrich_comments(comments)
+    return {"log": log, "comments": comments}
+
+
+@api.post("/logs/{log_id}/comments")
+async def add_comment(log_id: str, body: CommentIn, user: dict = Depends(get_current_user)):
+    await visible_log(log_id, user)
+    now = now_utc()
+    c = {
+        "comment_id": "cmt_" + uuid.uuid4().hex[:12],
+        "log_id": log_id,
+        "user_id": user["user_id"],
+        "body": body.body.strip(),
+        "created_at": now,
+        "deleted_at": None,
+    }
+    await db.comments.insert_one(dict(c))
+    c.pop("deleted_at", None)
+    (c,) = await enrich_comments([c])
+    return {"comment": c}
+
+
+@api.delete("/comments/{comment_id}")
+async def delete_comment(comment_id: str, user: dict = Depends(get_current_user)):
+    res = await db.comments.update_one(
+        {"comment_id": comment_id, "user_id": user["user_id"]}, {"$set": {"deleted_at": now_utc()}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Daily reminder preferences (scheduled locally on device)
+# ---------------------------------------------------------------------------
+class ReminderIn(BaseModel):
+    enabled: bool
+    hour: int = Field(ge=0, le=23)
+    minute: int = Field(ge=0, le=59)
+
+
+@api.patch("/profile/reminder")
+async def set_reminder(body: ReminderIn, user: dict = Depends(get_current_user)):
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"reminder_enabled": body.enabled, "reminder_hour": body.hour, "reminder_minute": body.minute}},
+    )
+    user = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return {"user": public_user(user)}
+
+
+# ---------------------------------------------------------------------------
+# Meetups (real-world practice circles)
+# ---------------------------------------------------------------------------
+import math
+
+
+def haversine_km(lat1, lon1, lat2, lon2) -> float:
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+class MeetupIn(BaseModel):
+    title: str = Field(min_length=3, max_length=100)
+    description: str = Field(default="", max_length=1000)
+    tradition: str = "mixed"  # dao | ayurveda | mixed
+    location_name: str = Field(min_length=2, max_length=140)
+    city: str = Field(min_length=1, max_length=80)
+    starts_at: str  # ISO datetime
+    capacity: Optional[int] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+
+class RsvpIn(BaseModel):
+    waiver_accepted: bool = False
+
+
+@api.post("/meetups")
+async def create_meetup(body: MeetupIn, user: dict = Depends(get_current_user)):
+    if body.tradition not in ("dao", "ayurveda", "mixed"):
+        raise HTTPException(status_code=400, detail="Invalid tradition")
+    m = {
+        "meetup_id": "mtp_" + uuid.uuid4().hex[:12],
+        "host_id": user["user_id"],
+        "title": body.title.strip(),
+        "description": body.description.strip(),
+        "tradition": body.tradition,
+        "location_name": body.location_name.strip(),
+        "city": body.city.strip(),
+        "starts_at": body.starts_at,
+        "capacity": body.capacity,
+        "lat": body.lat,
+        "lng": body.lng,
+        "created_at": now_utc(),
+        "deleted_at": None,
+    }
+    await db.meetups.insert_one(dict(m))
+    # host auto-RSVPs
+    await db.rsvps.update_one(
+        {"meetup_id": m["meetup_id"], "user_id": user["user_id"]},
+        {"$setOnInsert": {"waiver_accepted": True, "created_at": now_utc()}},
+        upsert=True,
+    )
+    m.pop("deleted_at", None)
+    return {"meetup": m}
+
+
+async def meetup_card(m: dict, user_id: str, lat=None, lng=None) -> dict:
+    host = await db.users.find_one({"user_id": m["host_id"]}, {"_id": 0})
+    attendees = await db.rsvps.count_documents({"meetup_id": m["meetup_id"]})
+    is_rsvped = bool(await db.rsvps.find_one({"meetup_id": m["meetup_id"], "user_id": user_id}))
+    distance = None
+    if lat is not None and lng is not None and m.get("lat") is not None and m.get("lng") is not None:
+        distance = round(haversine_km(lat, lng, m["lat"], m["lng"]), 1)
+    return {
+        **{k: m[k] for k in ("meetup_id", "host_id", "title", "description", "tradition", "location_name", "city", "starts_at", "capacity", "lat", "lng")},
+        "host": {"user_id": m["host_id"], "display_name": (host or {}).get("display_name"), "picture": (host or {}).get("picture")},
+        "attendees": attendees,
+        "is_rsvped": is_rsvped,
+        "is_host": m["host_id"] == user_id,
+        "distance_km": distance,
+    }
+
+
+@api.get("/meetups")
+async def list_meetups(user: dict = Depends(get_current_user), lat: Optional[float] = None, lng: Optional[float] = None):
+    now_iso = now_utc().isoformat()
+    docs = await db.meetups.find({"deleted_at": None, "starts_at": {"$gte": now_iso}}, {"_id": 0}).to_list(200)
+    cards = [await meetup_card(m, user["user_id"], lat, lng) for m in docs]
+    if lat is not None and lng is not None:
+        cards.sort(key=lambda c: (c["distance_km"] is None, c["distance_km"] if c["distance_km"] is not None else 0, c["starts_at"]))
+    else:
+        cards.sort(key=lambda c: c["starts_at"])
+    return {"meetups": cards}
+
+
+@api.get("/meetups/{meetup_id}")
+async def get_meetup(meetup_id: str, user: dict = Depends(get_current_user)):
+    m = await db.meetups.find_one({"meetup_id": meetup_id, "deleted_at": None}, {"_id": 0})
+    if not m:
+        raise HTTPException(status_code=404, detail="Meetup not found")
+    card = await meetup_card(m, user["user_id"])
+    rsvps = await db.rsvps.find({"meetup_id": meetup_id}, {"_id": 0}).to_list(300)
+    ids = [r["user_id"] for r in rsvps]
+    users = {u["user_id"]: u async for u in db.users.find({"user_id": {"$in": ids}}, {"_id": 0})}
+    attendees = [
+        {"user_id": uid, "display_name": users.get(uid, {}).get("display_name"), "picture": users.get(uid, {}).get("picture")}
+        for uid in ids
+    ]
+    return {"meetup": {**card, "attendee_list": attendees}}
+
+
+@api.post("/meetups/{meetup_id}/rsvp")
+async def rsvp(meetup_id: str, body: RsvpIn, user: dict = Depends(get_current_user)):
+    m = await db.meetups.find_one({"meetup_id": meetup_id, "deleted_at": None}, {"_id": 0})
+    if not m:
+        raise HTTPException(status_code=404, detail="Meetup not found")
+    if not body.waiver_accepted:
+        raise HTTPException(status_code=400, detail="Please accept the liability waiver to join")
+    if m.get("capacity"):
+        count = await db.rsvps.count_documents({"meetup_id": meetup_id})
+        already = await db.rsvps.find_one({"meetup_id": meetup_id, "user_id": user["user_id"]})
+        if not already and count >= m["capacity"]:
+            raise HTTPException(status_code=409, detail="This circle is full")
+    await db.rsvps.update_one(
+        {"meetup_id": meetup_id, "user_id": user["user_id"]},
+        {"$set": {"waiver_accepted": True}, "$setOnInsert": {"created_at": now_utc()}},
+        upsert=True,
+    )
+    return {"ok": True, "is_rsvped": True}
+
+
+@api.delete("/meetups/{meetup_id}/rsvp")
+async def cancel_rsvp(meetup_id: str, user: dict = Depends(get_current_user)):
+    await db.rsvps.delete_one({"meetup_id": meetup_id, "user_id": user["user_id"]})
+    return {"ok": True, "is_rsvped": False}
+
+
+@api.delete("/meetups/{meetup_id}")
+async def delete_meetup(meetup_id: str, user: dict = Depends(get_current_user)):
+    res = await db.meetups.update_one(
+        {"meetup_id": meetup_id, "host_id": user["user_id"]}, {"$set": {"deleted_at": now_utc()}}
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Meetup not found")
     return {"ok": True}
 
 
@@ -778,6 +1013,9 @@ async def on_startup():
     await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
     await db.logs.create_index([("user_id", 1), ("created_at", -1)])
     await db.follows.create_index([("follower_id", 1), ("following_id", 1)], unique=True)
+    await db.comments.create_index([("log_id", 1), ("created_at", 1)])
+    await db.rsvps.create_index([("meetup_id", 1), ("user_id", 1)], unique=True)
+    await db.meetups.create_index([("starts_at", 1)])
     await seed_content()
     init_storage()
     asyncio.create_task(generate_illustrations())

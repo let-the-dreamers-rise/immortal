@@ -35,6 +35,19 @@ and build a real-world community — framed strictly as historical exploration, 
 - Community: practitioners list, follow/unfollow, public feed, other-user profiles, personal profile banner.
 - Testing: 28/28 backend pytest pass; frontend e2e verified.
 
+## Implemented (2026-06, iteration 2)
+- Local Meetups: host/join real-world practice circles; opt-in device location for "nearby" distance sorting;
+  liability waiver embedded in RSVP flow; host auto-RSVP; host can cancel a circle. (Community → Meetups tab,
+  /meetup/new, /meetup/[id]). Backend: /api/meetups CRUD + rsvp.
+- Path Comments: replies on shared (public) reflections; log detail screen (/log/[id]) with comment thread;
+  comment_count on feed + journal entries; open from community feed and public journal entries.
+- Daily Reminders: settings toggle + time presets; local daily notification tuned to the user's path
+  (expo-notifications); permission handling with Open-Settings fallback; persisted via /api/profile/reminder.
+  (Device-only — no-op on web/Expo Go Android; fires on a real/dev build.)
+- Year 2 Path (Nei Gong): 3 new stages (Meridian Activation, Dantian & Microcosmic Orbit, Refined Meditation
+  & Integration) + 6 new Year-2 practices; journey map shows a Year 2 separator; stages lock until Year 1 done.
+- Testing: 41/41 backend pytest pass (28 regression + 13 new); all new frontend flows verified.
+
 ## Backlog / Remaining
 - P1: Meetups & discovery (location opt-in, RSVP, liability waiver, Google Maps).
 - P1: Push notifications (daily reminders, replies) — requires deployed build + Firebase google-services.json.

@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration-2 features tested end-to-end. Backend: 41/41 pytest passing (28 regression + 13 new for Meetups, Comments, Reminders, Year 2 Path). Verified: POST /api/meetups host auto-RSVPs; GET /api/meetups upcoming-only + ?lat=&lng= distance sort with populated distance_km; GET /api/meetups/{id} returns attendee_list; POST rsvp 400 when waiver_accepted=false and 200 when true; DELETE rsvp toggles is_rsvped=False; DELETE meetup host-only (404 for non-host); GET /api/logs/{id} returns log+comments; private log returns 403 for non-owner and 200 for owner; POST /api/logs/{id}/comments works; DELETE /api/comments/{id} author-only (404 for non-author); feed & log detail carry comment_count; PATCH /api/profile/reminder persists {enabled,hour,minute} and is reflected in public_user via /api/auth/me and /profile/reminder response; GET /api/path/stages returns 7 stages across years 1 & 2 (orders 1-7), Year-2 (5-7) locked until Year 1 complete (seeker still gets 5-7 locked); GET /api/path/stages/5 returns Year-2 practices (meridian-qigong, deep-body-awareness). Frontend (mobile viewport 390x844, in-app navigation): logged in as seeker; home Path dashboard now shows '0/7 Stages' and renders all 7 stage cards (stage-card-1..7) including YEAR 2 (Meridian Activation, Dantian, Three Treasures visible in DOM); Community 'Meetups' segment renders with 'Host a circle' + 'Near me' buttons and an existing seeded meetup card; meetup/new creation flow (title, description, tradition chip, location/city, day chip, hour chip) navigated to /meetup/{id} detail screen showing 'Hosted by River Seeker (you)', '1 going' (host auto-RSVP), and host-only 'Cancel this circle' button; log/[id] screen exposes comment-input, comment-send, and comment-delete-* testIDs; settings screen exposes reminder-toggle + reminder-time-* chips. Deprecated packages detected: none new in this iteration. Known pointerEvents deprecation warning persists (from a transitive dep). Direct-URL reload of gated tabs still 401s briefly during AuthContext hydration (pre-existing behaviour from iteration_1); in-app tab navigation works cleanly.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Direct URL page.goto to /community or /settings after login",
+        "issue": "Pre-existing AuthContext hydration race (called out in iteration_1). On full document reload of a gated route, apiFetch fires before the session token is restored, producing a red-screen 'Not authenticated' overlay in dev. In-app tab navigation (recommended path for users) works correctly. No new regression introduced by this iteration.",
+        "affected_testIDs": ["community-tab-meetups", "reminder-toggle"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "pointerEvents deprecation warning",
+        "issue": "Non-blocking warning still emitted at app load: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Coming from a dependency; not introduced by this iteration."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_backend.py",
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional / carry-over from iteration_1) Harden AuthContext hydration so full-reload of gated routes waits for the token restore before firing API calls."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~1027 lines (grew from 789 with meetups/comments/reminders). Splitting into routers (auth, path, logs, meetups, community) is increasingly warranted.",
+    "haversine_km + `import math` are declared inline near the meetups routes; move imports to top and helpers to a utils module for clarity.",
+    "meetup_card() is called sequentially in list_meetups (up to 200 docs each triggering a users lookup + rsvps count). Consider batching author lookups and $lookup/aggregation for attendees to avoid N+1 as the meetups collection grows.",
+    "Meetup starts_at is stored as an ISO STRING and compared with $gte to now_utc().isoformat(); this works only because both are ISO-8601 in the same TZ format. Storing as a real datetime is safer and index-friendly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_backend.py (updated: path stages count 4->7, stages_total 4->7, added Year-2 locked assertion)",
+    "/app/backend/tests/test_new_features.py (new: Meetups, Comments, Reminders, Year 2 Path tests)"
+  ],
+  "success_rate": {"backend": "100% (41/41)", "frontend": "100% of new-feature UI flows exercised via in-app navigation"},
+  "seed_data_creation": "Pytest tests create TEST_-prefixed users, meetups (cleaned up via DELETE), comments (cleaned up), and public/private logs (soft-deleted). Playwright session created one meetup as seeker and cancelled it; a stray public/private log with TEST_ body may remain from earlier iterations. No production data mutated.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend base URL: EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env (currently https://essence-path-1.preview.emergentagent.com). Auth /auth defaults to REGISTER — click [data-testid=auth-toggle-mode] once to switch to Sign in. To avoid the AuthContext hydration 401, always navigate to gated screens via in-app tabs or Pressables ([data-testid=community-tab-meetups], [data-testid=community-settings-button]) rather than page.goto. Year 2 stage cards render as stage-card-5..7 on home Path screen. Meetup detail testIDs: meetup-cancel-circle (host), meetup-waiver-checkbox + meetup-join-button + meetup-cancel-rsvp (guest). Log detail testIDs: comment-input, comment-send, comment-delete-<id>.",
+  "rca_of_issue": "No new bug found this iteration. All four features (Meetups, Comments, Reminders, Year 2 Path) implemented correctly at both API and UI layers."
+}
