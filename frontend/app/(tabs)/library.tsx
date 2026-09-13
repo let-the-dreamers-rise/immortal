@@ -47,6 +47,8 @@ export default function LibraryScreen() {
   const [tradition, setTradition] = useState("all");
   const [difficulty, setDifficulty] = useState("all");
   const [items, setItems] = useState<Practice[] | null>(null);
+  const [mode, setMode] = useState<"practices" | "teachings">("practices");
+  const [teachings, setTeachings] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setItems(null);
@@ -64,29 +66,68 @@ export default function LibraryScreen() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    apiFetch<{ teachings: any[] }>("/teachings").then((r) => setTeachings(r.teachings)).catch(() => setTeachings([]));
+  }, []);
+
+  const TGRADS: [string, string][] = [
+    ["#8C9A86", "#5E6C58"],
+    ["#C7A97C", "#8C7A6B"],
+    ["#6A7B82", "#3D4A4F"],
+  ];
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <Txt variant="title" style={{ fontSize: 22 }}>Practice Library</Txt>
-        <Txt variant="bodySm" style={{ marginTop: 2 }}>Curated practices across two living traditions.</Txt>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-          style={{ marginTop: spacing.md }}
-        >
-          {TRADITIONS.map((t) => (
-            <Chip key={t.key} label={t.label} active={tradition === t.key} onPress={() => setTradition(t.key)} testID={`filter-tradition-${t.key}`} />
-          ))}
-        </ScrollView>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {DIFFICULTIES.map((d) => (
-            <Chip key={d.key} label={d.label} active={difficulty === d.key} onPress={() => setDifficulty(d.key)} testID={`filter-difficulty-${d.key}`} />
-          ))}
-        </ScrollView>
+        <Txt variant="title" style={{ fontSize: 22 }}>Library</Txt>
+        <View style={styles.segment}>
+          <Pressable onPress={() => setMode("practices")} style={[styles.segBtn, mode === "practices" && styles.segBtnActive]} testID="library-tab-practices">
+            <Txt variant="label" color={mode === "practices" ? colors.onSurface : colors.muted}>Practices</Txt>
+          </Pressable>
+          <Pressable onPress={() => setMode("teachings")} style={[styles.segBtn, mode === "teachings" && styles.segBtnActive]} testID="library-tab-teachings">
+            <Txt variant="label" color={mode === "teachings" ? colors.onSurface : colors.muted}>Teachings</Txt>
+          </Pressable>
+        </View>
+        {mode === "practices" ? (
+          <>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipRow}
+            >
+              {TRADITIONS.map((t) => (
+                <Chip key={t.key} label={t.label} active={tradition === t.key} onPress={() => setTradition(t.key)} testID={`filter-tradition-${t.key}`} />
+              ))}
+            </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              {DIFFICULTIES.map((d) => (
+                <Chip key={d.key} label={d.label} active={difficulty === d.key} onPress={() => setDifficulty(d.key)} testID={`filter-difficulty-${d.key}`} />
+              ))}
+            </ScrollView>
+          </>
+        ) : null}
       </View>
 
-      {!items ? (
+      {mode === "teachings" ? (
+        <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: insets.bottom + spacing.xl }} showsVerticalScrollIndicator={false}>
+          <Txt variant="bodySm" style={{ marginBottom: spacing.lg }}>
+            Historical Daoist ideas behind the path — explored as philosophy and personal reflection, never medical advice.
+          </Txt>
+          {teachings.map((t, i) => (
+            <Pressable key={t.teaching_id} style={styles.teachingCard} onPress={() => router.push(`/teaching/${t.teaching_id}`)} testID={`teaching-${t.teaching_id}`}>
+              <View style={styles.teachingArt}>
+                <LinearGradient colors={TGRADS[i % 3]} style={StyleSheet.absoluteFill} />
+                <Txt style={{ fontFamily: "CormorantGaramond-Bold", fontSize: 40, color: "rgba(247,245,240,0.9)" }}>{t.chinese}</Txt>
+              </View>
+              <View style={{ flex: 1, marginLeft: spacing.lg }}>
+                <Txt variant="caption" color={colors.brandSecondary}>{t.category.toUpperCase()}</Txt>
+                <Txt variant="title" style={{ fontSize: 19, marginTop: 2 }}>{t.title}</Txt>
+                <Txt variant="bodySm" numberOfLines={2} style={{ marginTop: 2 }}>{t.subtitle}</Txt>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : !items ? (
         <Loading />
       ) : items.length === 0 ? (
         <EmptyState title="Nothing here yet" body="No practices found for this filter. Try another tradition or level." />
@@ -146,6 +187,11 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.divider,
   },
   chipRow: { gap: spacing.sm, paddingVertical: spacing.xs, paddingRight: spacing.xl },
+  segment: { flexDirection: "row", marginTop: spacing.md, backgroundColor: colors.surfaceSecondary, borderRadius: radius.pill, padding: 4 },
+  segBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: radius.pill },
+  segBtnActive: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  teachingCard: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md },
+  teachingArt: { width: 76, height: 76, borderRadius: radius.md, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   card: { width: CARD_W },
   thumb: {
     width: CARD_W,

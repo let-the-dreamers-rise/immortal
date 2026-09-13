@@ -31,6 +31,7 @@ from seed_data import (
     PRACTICE_ILLUSTRATION_SUBJECT,
     PRACTICES,
     STAGES,
+    TEACHINGS,
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -336,6 +337,19 @@ async def get_practice(practice_id: str):
     d["illustration_url"] = illustration_url(d["practice_id"])
     d["has_illustration"] = bool(d.get("illustration_path"))
     return {"practice": d}
+
+
+@api.get("/teachings")
+async def list_teachings():
+    return {"teachings": TEACHINGS}
+
+
+@api.get("/teachings/{teaching_id}")
+async def get_teaching(teaching_id: str):
+    t = next((x for x in TEACHINGS if x["teaching_id"] == teaching_id), None)
+    if not t:
+        raise HTTPException(status_code=404, detail="Teaching not found")
+    return {"teaching": t}
 
 
 @api.get("/illustrations/{practice_id}")

@@ -79,6 +79,17 @@ export default function PracticeDetail() {
             </View>
           ) : null}
 
+          {["Breathwork", "Pranayama", "Internal"].includes(p.category) ? (
+            <View style={styles.readiness}>
+              <Txt variant="label" style={{ marginBottom: spacing.xs }}>Before you begin</Txt>
+              <Txt variant="bodySm" color={colors.onSurfaceSecondary}>
+                Breath and internal practices ask a little of the body. Please skip today, ease off, or check with your
+                doctor first if you are pregnant, have a heart, blood-pressure or respiratory condition, a seizure or
+                fainting history, or simply feel unwell. Never force the breath — stop if you feel dizzy.
+              </Txt>
+            </View>
+          ) : null}
+
           <Section label="Historical context">
             <Txt variant="caption" color={colors.brandSecondary} style={{ marginBottom: 4 }}>{p.origin_text}</Txt>
             <Txt variant="body">{p.historical_context}</Txt>
@@ -160,4 +171,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   step: { flexDirection: "row", alignItems: "flex-start", marginBottom: spacing.md, gap: spacing.sm },
+  readiness: { marginTop: spacing.lg, padding: spacing.lg, backgroundColor: colors.surfaceSecondary, borderRadius: radius.md, borderLeftWidth: 3, borderLeftColor: colors.info },
 });

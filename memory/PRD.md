@@ -59,3 +59,19 @@ and build a real-world community — framed strictly as historical exploration, 
 ## Notes
 - No payments in v1. Human-curated content (no AI recommendations) to maintain trust.
 - LLM illustration budget on the shared universal key is capped; top up to generate remaining images.
+
+## Implemented (2026-09, iteration 3 — Dao enrichment from clinical dossier)
+- Ba Duan Jin now lists all 8 named brocades; Wu Qin Xi lists the 5 animals with Five-Element/organ pairing.
+- Added `evidence_note` (honest, dossier-grounded) to Ba Duan Jin, Wu Qin Xi, Zhan Zhuang, Jinggong; shown as
+  a "What the evidence says" section on the practice screen.
+- Added a gentle PAR-Q-style "Before you begin" readiness note on Breathwork/Pranayama/Internal practices.
+- New Teachings section in Library (Practices | Teachings segment): 8 Daoist concepts (Yangsheng, Three
+  Treasures, Neidan, Wu Wei, Dao & De, Xian, Microcosmic Orbit, Zuowang) with detail screens + calligraphy art.
+  Backend: GET /api/teachings, /api/teachings/{id}. Content framed as historical exploration, not medical advice.
+- Verified: teachings + enriched practice content via curl; Teachings screen + Ba Duan Jin detail via screenshots;
+  core flows (auth, path, library) regression-checked; lint clean.
+
+## Still open
+- Roll named sub-forms / evidence tiers / safety notes across ALL remaining practices (Yijinjing, Liuzijue six
+  sounds, Taixi caution, etc. from dossier §3–5) — partially done.
+- Generate remaining ink-wash illustrations — blocked on Universal Key budget cap (user must top up).

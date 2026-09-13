@@ -149,6 +149,7 @@ PRACTICES = [
             "Start with a few minutes and grow slowly over weeks.",
         ],
         "safety_note": "Come down gently if the legs shake strongly or you feel faint.",
+        "evidence_note": "Early but promising: small randomized trials in Parkinson's disease and in student wellbeing suggest benefits for balance and calm, with a plausible effect on the nervous system. Evidence is still at an early stage.",
     },
     {
         "practice_id": "jinggong",
@@ -168,6 +169,7 @@ PRACTICES = [
             "End by rubbing the hands and gently opening the eyes.",
         ],
         "safety_note": None,
+        "evidence_note": "Meditation research is honest in both directions: many people find real reductions in stress, while a minority experience anxiety or unsettledness — more likely with long, intense sessions. Keep sittings gentle and stop if stillness turns to agitation.",
     },
     {
         "practice_id": "yangsheng-diet",
@@ -670,4 +672,94 @@ PRACTICE_ILLUSTRATION_SUBJECT = {
     "microcosmic-orbit": "a seated figure with a soft circular current of light along the spine and front",
     "three-treasures": "three nested soft circles representing essence, energy and spirit",
     "extended-sitting": "a lone figure in long seated meditation beneath a vast quiet sky",
+}
+
+# ---------------------------------------------------------------------------
+# TEACHINGS — Daoist longevity & immortality concepts (historical exploration)
+# ---------------------------------------------------------------------------
+
+TEACHINGS = [
+    {
+        "teaching_id": "yangsheng",
+        "title": "Yangsheng — Nourishing Life",
+        "chinese": "\u990a\u751f",
+        "subtitle": "The root of the whole tradition",
+        "category": "Foundations",
+        "source_text": "Zhuangzi, ch. 3 \u00b7 Huangdi Neijing",
+        "body": "Yangsheng (\u990a\u751f, 'nourishing life') is the umbrella under which every practice in this app sits \u2014 a family of self-cultivation methods aimed at health and long life rather than at curing disease. The Zhuangzi's chapter 'Essentials for Nurturing Life' already describes 'blowing and breathing, exhaling and inhaling' two thousand years ago, while warning that physical technique alone is not enough. The Daoist tradition distinguishes changsheng (extended human life) from xian (transcendence); the honest teaching is that the foundation of any longevity is simply a well-tended, ordinary life \u2014 warm food, regular sleep, moderate effort, and calm attention.",
+    },
+    {
+        "teaching_id": "three-treasures",
+        "title": "The Three Treasures",
+        "chinese": "\u4e09\u5bf6",
+        "subtitle": "Jing, Qi and Shen",
+        "category": "Foundations",
+        "source_text": "Neidan tradition \u00b7 Wuzhen Pian",
+        "body": "Daoist inner cultivation is organised around three 'treasures': Jing (\u7cbe, essence \u2014 the dense, physical root of vitality), Qi (\u6c14, the breath and vital energy that animates the body), and Shen (\u795e, spirit or awareness). Classical practice is often summarised as 'refining Jing into Qi, Qi into Shen, and Shen back into emptiness'. In plain terms: care for the body's essence through rest and moderation, cultivate steady energy through breath and movement, and let a clear, quiet mind emerge. The Wuzhen Pian argues the whole 'elixir' is already inside the body \u2014 nothing external needs to be swallowed.",
+    },
+    {
+        "teaching_id": "neidan",
+        "title": "Neidan — Internal Alchemy",
+        "chinese": "\u5185\u4e39",
+        "subtitle": "The elixir grown within",
+        "category": "Inner Work",
+        "source_text": "Zhouyi Cantong Qi \u00b7 Wuzhen Pian (1075)",
+        "body": "Neidan ('internal alchemy') reimagines the old external laboratory \u2014 furnaces, lead and mercury \u2014 as a map of processes inside the practitioner's own body and mind. Where earlier waidan alchemists brewed literal elixirs (often toxic, and excluded from this app entirely), neidan treats the 'furnace' as the lower dantian and the 'ingredients' as Jing, Qi and Shen. It is slow, symbolic, and stage-based, and the classical texts themselves warn that most who chase it forcefully 'die prematurely'. Here it is presented as historical philosophy and gentle attention practice \u2014 never as a race, and never as medicine.",
+    },
+    {
+        "teaching_id": "wu-wei",
+        "title": "Wu Wei — Effortless Action",
+        "chinese": "\u65e0\u4e3a",
+        "subtitle": "Doing by not-forcing",
+        "category": "Philosophy",
+        "source_text": "Dao De Jing",
+        "body": "Wu wei (\u65e0\u4e3a) is often mistranslated as 'doing nothing'. It means acting without forcing \u2014 moving with the grain of a situation rather than against it, like water finding its way downhill. In practice this is the single most important instruction in the whole app: do not chase sensations, do not strain the breath, do not grip the pose. 'The soft and weak overcome the hard and strong,' says the Dao De Jing. Progress in cultivation arrives the way sleep arrives \u2014 by creating the conditions and then letting go, not by trying harder.",
+    },
+    {
+        "teaching_id": "dao-de",
+        "title": "Dao & De",
+        "chinese": "\u9053\u5fb7",
+        "subtitle": "The Way and its power",
+        "category": "Philosophy",
+        "source_text": "Dao De Jing (Laozi)",
+        "body": "Dao (\u9053, 'the Way') is the unnameable source and pattern of everything \u2014 'the Dao that can be spoken is not the eternal Dao'. De (\u5fb7) is its expression in a life: the quiet integrity that arises when a person lives in accord with the Way rather than against it. Longevity in the Daoist sense is less a technique than a by-product of De \u2014 of ziran (\u81ea\u7136, naturalness), simplicity, and knowing when enough is enough. The teachings are an invitation to align the small rhythms of your day with something much larger and older than yourself.",
+    },
+    {
+        "teaching_id": "xian",
+        "title": "Xian — The Immortals",
+        "chinese": "\u4ed9",
+        "subtitle": "What 'immortality' really meant",
+        "category": "Philosophy",
+        "source_text": "Baopuzi (Ge Hong, 317 CE)",
+        "body": "The character xian (\u4ed9) \u2014 a person beside a mountain \u2014 names the Daoist 'immortal' or transcendent. Ge Hong's Baopuzi describes tiers of xian: celestial, earthly, and 'corpse-liberated'. It is easy to read this literally, but the enduring teaching is subtler: the xian is a picture of a human being so aligned with the Dao, so unhurried and undepleted, that they seem to live outside ordinary wear and worry. This app treats immortality as historical aspiration and metaphor \u2014 a direction to face, not a promise \u2014 and points instead at the very real gift of aging with clarity and calm.",
+    },
+    {
+        "teaching_id": "microcosmic-orbit-teaching",
+        "title": "The Microcosmic Orbit",
+        "chinese": "\u5c0f\u5468\u5929",
+        "subtitle": "The small heavenly circulation",
+        "category": "Inner Work",
+        "source_text": "Neidan tradition",
+        "body": "The xiao zhou tian ('small heavenly circulation') is an advanced attention practice in which awareness is gently guided along the Governing vessel up the spine and the Conception vessel down the front of the body, forming a quiet circle. The jade inscription on circulating breath (Warring States period) closes with a stark line: 'comply then live; oppose then die' \u2014 the tradition's own reminder that this is done softly, on a stable foundation, and never by force. In this app it belongs to Year 2, and only after the body and breath of Year 1 are settled.",
+    },
+    {
+        "teaching_id": "zuowang",
+        "title": "Zuowang — Sitting in Oblivion",
+        "chinese": "\u5750\u5fd8",
+        "subtitle": "Letting the self grow quiet",
+        "category": "Inner Work",
+        "source_text": "Zuowang Lun (Tang dynasty)",
+        "body": "Zuowang, often rendered 'sitting in oblivion' (Livia Kohn prefers 'oblivion' to 'forgetting'), is the quietist heart of Daoist meditation \u2014 relinquishing the mind's constant intentional patterns until a clear stillness remains. The Zuowang Lun lays out seven graded stages from 'respect and faith' to 'realising the Dao'. Modern contemplative research is honest that meditation helps many yet unsettles a minority; the classical texts agree, cautioning against too much intensity too fast. Sit lightly, keep sessions gentle, and stop if stillness turns to agitation.",
+    },
+]
+
+TEACHING_IMAGE_INDEX = {
+    "yangsheng": 0,
+    "three-treasures": 1,
+    "neidan": 2,
+    "wu-wei": 0,
+    "dao-de": 1,
+    "xian": 2,
+    "microcosmic-orbit-teaching": 0,
+    "zuowang": 1,
 }
