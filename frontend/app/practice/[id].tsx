@@ -20,6 +20,7 @@ type Practice = {
   origin_text: string;
   historical_context: string;
   modern_understanding: string;
+  evidence_note?: string | null;
   instructions: string[];
   safety_note?: string | null;
   illustration_url: string;
@@ -86,6 +87,12 @@ export default function PracticeDetail() {
           <Section label="Modern understanding">
             <Txt variant="body">{p.modern_understanding}</Txt>
           </Section>
+
+          {p.evidence_note ? (
+            <Section label="What the evidence says">
+              <Txt variant="body">{p.evidence_note}</Txt>
+            </Section>
+          ) : null}
 
           <Section label="How to practise">
             {p.instructions.map((step, i) => (
