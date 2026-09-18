@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { Platform } from "react-native";
-import { House, BookOpen, NotePencil, UsersThree } from "phosphor-react-native";
+import { Sun, House, BookOpen, NotePencil, UsersThree } from "phosphor-react-native";
 
 import { colors, fonts } from "@/src/theme";
 
@@ -21,6 +21,15 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontFamily: fonts.bodyMedium, fontSize: 11 },
       }}
     >
+      <Tabs.Screen
+        name="today"
+        options={{
+          title: "Today",
+          tabBarIcon: ({ color, focused }) => (
+            <Sun size={24} color={color} weight={focused ? "fill" : "regular"} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{

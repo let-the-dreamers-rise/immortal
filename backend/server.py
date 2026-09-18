@@ -26,6 +26,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 from starlette.middleware.cors import CORSMiddleware
 
+from today import build_today
 from seed_data import (
     ILLUSTRATION_STYLE,
     PRACTICE_ILLUSTRATION_SUBJECT,
@@ -427,6 +428,53 @@ def stage_status(order: int, progress: dict) -> dict:
         "started_at": (st or {}).get("started_at"),
         "completed_at": (st or {}).get("completed_at"),
     }
+
+
+
+# ---------------------------------------------------------------------------
+# Today
+# ---------------------------------------------------------------------------
+@api.get("/today")
+async def today(user: dict = Depends(get_current_user)):
+    """One practice for right now, plus the pine.
+
+    Answers "what do I do today" so the practitioner does not have to. The
+    growth model is accumulated days rather than a streak, so a missed day
+    costs nothing.
+    """
+    now = now_utc()
+    uid = user["user_id"]
+
+    logs = await db.logs.find({"user_id": uid, "deleted_at": None}, {"_id": 0, "date": 1}).to_list(2000)
+    dates = {l["date"] for l in logs}
+    total_days = len(dates)
+    logged_today = now.strftime("%Y-%m-%d") in dates
+
+    # The stage in progress, else the first one available.
+    progress = await get_progress_doc(uid)
+    stage = None
+    for st in sorted(STAGES, key=lambda x: x["order"]):
+        state = stage_status(st["order"], progress)["state"]
+        if state == "in_progress":
+            stage = st
+            break
+        if state == "available" and stage is None:
+            stage = st
+
+    docs = await db.practices.find({"status": "approved"}, {"_id": 0}).to_list(500)
+    for d in docs:
+        d["illustration_url"] = illustration_url(d["practice_id"])
+
+    payload = build_today(
+        now=now,
+        practices=docs,
+        stage_practice_ids=(stage or {}).get("practices", []),
+        total_days=total_days,
+        logged_today=logged_today,
+        stage_title=(stage or {}).get("title"),
+    )
+    payload["stage_order"] = (stage or {}).get("order")
+    return payload
 
 
 @api.get("/path/stages")

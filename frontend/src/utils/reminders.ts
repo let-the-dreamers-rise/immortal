@@ -10,11 +10,44 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const MESSAGES: Record<string, string> = {
-  dao: "A quiet moment awaits. Move, breathe, and note how today felt on the Dao Path.",
-  ayurveda: "Time for your daily rhythm. A little practice, then a line in your journal.",
-  both: "A gentle pause for practice. Show up, however small — then log it.",
-};
+// The reminder names something specific and small enough to say yes to while
+// standing somewhere. A prompt to "practise" asks the reader to decide what
+// and for how long, which is the decision this app exists to remove; a prompt
+// naming forty seconds of tooth tapping on a bus does not.
+//
+// Rotated by day so the same line does not arrive every morning. No streak is
+// mentioned and no day is described as missed — nothing here should make
+// returning feel like an apology.
+const NUDGES: { title: string; body: string }[] = [
+  {
+    title: "Forty seconds, wherever you are",
+    body: "Tapping the teeth — Kou Chi. Nobody can tell you are doing it. Ge Hong wrote it down in 318.",
+  },
+  {
+    title: "On the way",
+    body: "Walking somewhere? Breathe in over four steps, out over four. That is the whole practice.",
+  },
+  {
+    title: "While you wait",
+    body: "Rub the palms until they are warm, then hold them apart and notice what is there. Often nothing. That counts.",
+  },
+  {
+    title: "If you are on a bus",
+    body: "Unlock the knees, let the shoulders drop, and feel the small corrections your body is already making.",
+  },
+  {
+    title: "A minute of stillness",
+    body: "Sit as you are and decide not to move for sixty seconds. Notice where you wanted to move first.",
+  },
+  {
+    title: "Rest the eyes",
+    body: "Look at the furthest thing you can see, and let the gaze go wide. Twenty seconds is enough.",
+  },
+  {
+    title: "Three breaths",
+    body: "One hand below the navel. Breathe so the belly moves, out a little longer than in. Three is the whole thing.",
+  },
+];
 
 export type PermissionOutcome = "granted" | "denied" | "blocked";
 
@@ -32,7 +65,7 @@ export async function requestReminderPermission(): Promise<PermissionOutcome> {
   }
 }
 
-export async function scheduleDailyReminder(hour: number, minute: number, path?: string | null) {
+export async function scheduleDailyReminder(hour: number, minute: number, _path?: string | null) {
   if (Platform.OS === "web") return;
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
@@ -42,10 +75,13 @@ export async function scheduleDailyReminder(hour: number, minute: number, path?:
         importance: Notifications.AndroidImportance.DEFAULT,
       });
     }
+    // Day-of-year rotation: a different nudge each day without storing state.
+    const dayIndex = Math.floor(Date.now() / 86400000);
+    const nudge = NUDGES[dayIndex % NUDGES.length];
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "A moment for your practice",
-        body: MESSAGES[path || "both"] || MESSAGES.both,
+        title: nudge.title,
+        body: nudge.body,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
