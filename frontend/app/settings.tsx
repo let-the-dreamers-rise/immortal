@@ -155,7 +155,7 @@ export default function Settings() {
         </Pressable>
 
         <Txt variant="caption" center style={{ marginTop: spacing.xxl, lineHeight: 16 }}>
-          Immortality is a space for historical exploration and personal practice — not medical advice.
+          Essence Path is a space for historical exploration and personal practice — not medical advice.
         </Txt>
       </KeyboardAwareScrollView>
     </View>

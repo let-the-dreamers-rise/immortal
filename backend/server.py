@@ -20,7 +20,7 @@ import bcrypt
 import httpx
 import requests
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -49,6 +49,12 @@ db = client[os.environ["DB_NAME"]]
 
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
 SESSION_TTL_DAYS = 30
+
+# Auth throttling. Backed by Mongo rather than process memory so the limit holds
+# across workers and survives restarts — an in-process counter is trivially
+# defeated by spreading attempts, which is exactly what credential stuffing does.
+AUTH_MAX_ATTEMPTS = 8
+AUTH_WINDOW_SECONDS = 300
 
 # ---------------------------------------------------------------------------
 # Object storage
@@ -144,7 +150,7 @@ def public_user(u: dict) -> dict:
 # ---------------------------------------------------------------------------
 class RegisterIn(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)
     display_name: str = Field(min_length=2, max_length=40)
 
 
@@ -165,6 +171,30 @@ class OnboardingIn(BaseModel):
 class ProfileIn(BaseModel):
     display_name: Optional[str] = None
     bio: Optional[str] = None
+
+
+def client_ip(request: Request) -> str:
+    """Caller IP, honouring the proxy header the app is deployed behind."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+async def enforce_auth_rate_limit(key: str) -> None:
+    """Throttle repeated auth attempts against the same key.
+
+    Records every attempt, so a caller that is already over the limit stays
+    locked out for the full window rather than regaining one attempt per tick.
+    """
+    cutoff = now_utc() - timedelta(seconds=AUTH_WINDOW_SECONDS)
+    recent = await db.auth_attempts.count_documents({"key": key, "at": {"$gte": cutoff}})
+    await db.auth_attempts.insert_one({"key": key, "at": now_utc()})
+    if recent >= AUTH_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many attempts. Please wait a few minutes and try again.",
+        )
 
 
 async def create_session(user_id: str) -> str:
@@ -202,7 +232,8 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
 # Auth routes
 # ---------------------------------------------------------------------------
 @api.post("/auth/register")
-async def register(body: RegisterIn):
+async def register(body: RegisterIn, request: Request):
+    await enforce_auth_rate_limit(f"register:{client_ip(request)}")
     email = body.email.lower()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=409, detail="An account with this email already exists")
@@ -225,7 +256,9 @@ async def register(body: RegisterIn):
 
 
 @api.post("/auth/login")
-async def login(body: LoginIn):
+async def login(body: LoginIn, request: Request):
+    await enforce_auth_rate_limit(f"login:{body.email.lower()}")
+    await enforce_auth_rate_limit(f"login-ip:{client_ip(request)}")
     user = await db.users.find_one({"email": body.email.lower()})
     if not user or not user.get("hashed_password") or not verify_password(body.password, user["hashed_password"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
@@ -957,10 +990,14 @@ async def root():
 
 app.include_router(api)
 
+# Origins come from CORS_ORIGINS (comma-separated) in deployed environments.
+# Auth travels in an Authorization header rather than a cookie, so credentialed
+# CORS is not needed — and "*" with allow_credentials is rejected by browsers.
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
+    allow_credentials=False,
+    allow_origins=_cors_origins or ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1030,6 +1067,8 @@ async def on_startup():
     await db.comments.create_index([("log_id", 1), ("created_at", 1)])
     await db.rsvps.create_index([("meetup_id", 1), ("user_id", 1)], unique=True)
     await db.meetups.create_index([("starts_at", 1)])
+    await db.auth_attempts.create_index("key")
+    await db.auth_attempts.create_index("at", expireAfterSeconds=AUTH_WINDOW_SECONDS)
     await seed_content()
     init_storage()
     asyncio.create_task(generate_illustrations())

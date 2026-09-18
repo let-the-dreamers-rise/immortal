@@ -59,7 +59,7 @@ type Meetup = {
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<"practitioners" | "feed" | "meetups">("practitioners");
   const [stats, setStats] = useState<Stats | null>(null);
   const [people, setPeople] = useState<Practitioner[]>([]);
@@ -109,7 +109,9 @@ export default function CommunityScreen() {
     }
   };
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Wait for the session token to be restored before fetching: gated requests
+  // sent during bootstrap 401 and would pin empty practitioner/feed lists.
+  useFocusEffect(useCallback(() => { if (!authLoading) load(); }, [authLoading, load]));
 
   const onRefresh = async () => {
     setRefreshing(true);

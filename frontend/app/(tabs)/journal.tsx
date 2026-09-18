@@ -7,6 +7,7 @@ import * as Haptics from "expo-haptics";
 
 import { Button, EmptyState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
 import { colors, radius, spacing } from "@/src/theme";
 
 type Log = {
@@ -32,6 +33,7 @@ function formatDate(iso: string) {
 export default function JournalScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { loading: authLoading } = useAuth();
   const [logs, setLogs] = useState<Log[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -46,7 +48,9 @@ export default function JournalScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Wait for the session token to be restored before fetching: a gated request
+  // sent during bootstrap 401s, and the catch above would pin an empty timeline.
+  useFocusEffect(useCallback(() => { if (!authLoading) load(); }, [authLoading, load]));
 
   const onRefresh = async () => {
     setRefreshing(true);

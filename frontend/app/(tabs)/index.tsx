@@ -30,7 +30,7 @@ type Stage = {
 export default function PathScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [stages, setStages] = useState<Stage[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -43,10 +43,13 @@ export default function PathScreen() {
     }
   }, []);
 
+  // Wait for the session token to be restored before fetching: a gated request
+  // sent during bootstrap 401s, and the catch below would pin an empty path.
   useFocusEffect(
     useCallback(() => {
+      if (authLoading) return;
       load();
-    }, [load])
+    }, [authLoading, load])
   );
 
   const onRefresh = async () => {
