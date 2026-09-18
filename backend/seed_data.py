@@ -11,6 +11,7 @@ practices and personal exploration — never as medical advice.
 
 from ayurveda_practices import AYURVEDA_PRACTICES
 from micro_practices import MICRO_PRACTICES
+from on_the_go_practices import ON_THE_GO_PRACTICES
 
 PRACTICES = [
     # ---------------- DAO ----------------
@@ -522,7 +523,7 @@ PRACTICES = [
 
 # Micro-practices: the 30-90s on-ramp. Appended so they sort last by `order`,
 # while staying queryable through the `micro` flag each one carries.
-PRACTICES = PRACTICES + AYURVEDA_PRACTICES + MICRO_PRACTICES
+PRACTICES = PRACTICES + AYURVEDA_PRACTICES + MICRO_PRACTICES + ON_THE_GO_PRACTICES
 
 # ---------------------------------------------------------------------------
 # THE DAO PATH — Year 1: Foundation (Zhu Ji)
