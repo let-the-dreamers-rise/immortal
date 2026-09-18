@@ -2,17 +2,20 @@ import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Leaf, YinYang, Sparkle } from "phosphor-react-native";
+import { YinYang, Sparkle } from "phosphor-react-native";
 
 import { Button, Txt } from "@/src/components/ui";
 import { useAuth } from "@/src/context/AuthContext";
 import { apiFetch } from "@/src/api/client";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
+// The guided curriculum is Daoist, and only Daoist. Offering a standalone
+// "Ayurveda" path promised a staged journey that does not exist — the stage
+// list is Dao end to end. Both options below therefore walk the same path and
+// differ only in what sits in the library beside it.
 const PATHS = [
-  { key: "dao", title: "The Dao Path", desc: "A structured Chinese Daoist journey — movement, breath, stillness.", Icon: YinYang },
-  { key: "ayurveda", title: "Ayurveda", desc: "Daily routines, breathwork and seasonal living from India.", Icon: Leaf },
-  { key: "both", title: "Both Traditions", desc: "Walk the guided Dao Path and explore Ayurveda alongside.", Icon: Sparkle },
+  { key: "dao", title: "The Dao Path", desc: "The guided journey — movement, breath and stillness, staged over two years.", Icon: YinYang },
+  { key: "both", title: "The Dao Path, with Ayurveda", desc: "The same guided journey, with Ayurvedic practices in your library alongside it.", Icon: Sparkle },
 ];
 
 export default function Onboarding() {
@@ -61,8 +64,12 @@ export default function Onboarding() {
           testID="onboarding-intention-input"
         />
 
-        <Txt variant="title" style={{ marginTop: spacing.xxl, marginBottom: spacing.md }}>
+        <Txt variant="title" style={{ marginTop: spacing.xxl, marginBottom: spacing.xs }}>
           Choose your path
+        </Txt>
+        <Txt variant="caption" style={{ marginBottom: spacing.md }}>
+          The guided journey is Daoist. Ayurvedic practices sit in the library beside it, not as a
+          separate path.
         </Txt>
         {PATHS.map((p) => {
           const active = choice === p.key;
