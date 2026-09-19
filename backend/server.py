@@ -26,7 +26,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 from starlette.middleware.cors import CORSMiddleware
 
-from today import build_today
+from today import build_today, growth_for
 from seed_data import (
     ILLUSTRATION_STYLE,
     PRACTICE_ILLUSTRATION_SUBJECT,
@@ -944,6 +944,8 @@ async def build_stats(user_id: str) -> dict:
     achieved = [m for m in MILESTONES if streaks["longest"] >= m or streaks["total_days"] >= m]
     is_elder = streaks["longest"] >= 90 or streaks["total_days"] >= 108
     return {
+        # The public standing. Accumulated days, never a streak — see today.py.
+        "growth": growth_for(streaks["total_days"]),
         "streak_current": streaks["current"],
         "streak_longest": streaks["longest"],
         "total_days": streaks["total_days"],
@@ -978,15 +980,20 @@ async def practitioners(user: dict = Depends(get_current_user)):
     out = []
     for u in users:
         stats = await build_stats(u["user_id"])
+        last = await db.logs.find_one(
+            {"user_id": u["user_id"], "deleted_at": None}, {"_id": 0, "date": 1}, sort=[("date", -1)]
+        )
         out.append(
             {
                 **public_user(u),
-                "is_elder": stats["is_elder"],
-                "streak_longest": stats["streak_longest"],
+                "growth": stats["growth"],
+                "last_practised": (last or {}).get("date"),
                 "is_following": u["user_id"] in following,
             }
         )
-    out.sort(key=lambda x: (not x["is_elder"], -x["streak_longest"]))
+    # Most recently practised first. Recency is a fact about who is around;
+    # a streak ranking would be a claim about who is doing better.
+    out.sort(key=lambda x: (x["last_practised"] or "", x["display_name"] or ""), reverse=True)
     return {"practitioners": out}
 
 

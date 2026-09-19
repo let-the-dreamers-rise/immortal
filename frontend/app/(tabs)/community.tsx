@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Crown, Flame, GearSix, ChatCircle, MapPin, CalendarBlank } from "phosphor-react-native";
+import { GearSix, ChatCircle, MapPin, CalendarBlank } from "phosphor-react-native";
 import * as Location from "expo-location";
 
 import { Avatar, Button, EmptyState, Loading, Txt } from "@/src/components/ui";
@@ -13,12 +13,9 @@ import { useAuth } from "@/src/context/AuthContext";
 import { colors, fonts, IMAGES, radius, spacing } from "@/src/theme";
 
 type Stats = {
-  streak_current: number;
-  streak_longest: number;
+  growth: { glyph: string; label: string; days: number };
   total_days: number;
   total_logs: number;
-  is_elder: boolean;
-  milestones_achieved: number[];
   stages_completed: number;
   stages_total: number;
 };
@@ -28,8 +25,8 @@ type Practitioner = {
   display_name: string;
   picture?: string | null;
   intention?: string | null;
-  is_elder: boolean;
-  streak_longest: number;
+  growth: { glyph: string; label: string; days: number };
+  last_practised: string | null;
   is_following: boolean;
 };
 
@@ -154,35 +151,19 @@ export default function CommunityScreen() {
                 <Avatar name={user?.display_name} uri={user?.picture} size={56} />
                 <View style={{ flex: 1 }}>
                   <Txt variant="title" color={colors.onSurfaceInverse} style={{ fontSize: 22 }}>{user?.display_name}</Txt>
-                  {stats?.is_elder ? (
-                    <View style={styles.elderRow}>
-                      <Crown size={14} color={colors.warning} weight="fill" />
-                      <Txt variant="caption" color={colors.warning} style={{ marginLeft: 4 }}>ELDER</Txt>
-                    </View>
-                  ) : (
-                    <Txt variant="caption" color={colors.onSurfaceInverse} style={{ opacity: 0.8 }}>PRACTITIONER</Txt>
-                  )}
+                  <View style={styles.standingRow}>
+                    <Txt variant="caption" color={colors.onSurfaceInverse} style={{ opacity: 0.9 }}>
+                      {stats?.growth?.glyph} {stats?.growth?.label?.toUpperCase()}
+                    </Txt>
+                  </View>
                 </View>
               </View>
               <View style={styles.statRow}>
-                <Stat value={stats?.streak_current ?? 0} label="Day streak" inverse />
-                <Stat value={stats?.total_days ?? 0} label="Days practiced" inverse />
+                <Stat value={stats?.growth?.days ?? 0} label="Days of practice" inverse />
+                <Stat value={stats?.total_logs ?? 0} label="Reflections" inverse />
                 <Stat value={`${stats?.stages_completed ?? 0}/${stats?.stages_total ?? 4}`} label="Stages" inverse />
               </View>
             </View>
-          </View>
-
-          {/* Milestones */}
-          <View style={styles.milestones}>
-            {[7, 30, 90, 365].map((m) => {
-              const got = stats?.milestones_achieved.includes(m);
-              return (
-                <View key={m} style={[styles.milestone, got && { backgroundColor: colors.brandTertiary, borderColor: colors.brandPrimary }]}>
-                  <Txt style={{ fontFamily: fonts.display, fontSize: 20, color: got ? colors.onSurface : colors.muted }}>{m}</Txt>
-                  <Txt variant="caption" color={got ? colors.brandPrimary : colors.muted}>DAYS</Txt>
-                </View>
-              );
-            })}
           </View>
 
           {/* Tabs */}
@@ -208,11 +189,12 @@ export default function CommunityScreen() {
                     <View style={{ flex: 1, marginLeft: spacing.md }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                         <Txt variant="label">{p.display_name}</Txt>
-                        {p.is_elder ? <Crown size={13} color={colors.warning} weight="fill" /> : null}
                       </View>
                       <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
-                        <Flame size={12} color={colors.brandSecondary} weight="regular" />
-                        <Txt variant="caption" style={{ marginLeft: 3 }}>Best streak {p.streak_longest}d</Txt>
+                        <Txt variant="caption" color={colors.muted}>
+                          {p.growth?.glyph} {p.growth?.label}
+                          {p.last_practised ? ` · last practised ${p.last_practised}` : ""}
+                        </Txt>
                       </View>
                     </View>
                     <Button
@@ -348,7 +330,7 @@ const styles = StyleSheet.create({
   },
   banner: { margin: spacing.xl, borderRadius: radius.lg, overflow: "hidden", minHeight: 180 },
   bannerContent: { padding: spacing.lg, justifyContent: "flex-end", flex: 1 },
-  elderRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
+  standingRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
   statRow: { flexDirection: "row", justifyContent: "space-between", marginTop: spacing.lg },
   milestones: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: spacing.xl, gap: spacing.sm },
   milestone: {

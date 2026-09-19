@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft, Crown } from "phosphor-react-native";
+import { CaretLeft } from "phosphor-react-native";
 
 import { Avatar, Button, EmptyState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
@@ -14,9 +14,8 @@ type Profile = {
   picture?: string | null;
   bio?: string | null;
   intention?: string | null;
-  is_elder: boolean;
-  streak_current: number;
-  streak_longest: number;
+  growth: { glyph: string; label: string; days: number };
+  total_days: number;
   total_days: number;
   followers: number;
   following: number;
@@ -72,7 +71,7 @@ export default function UserProfile() {
           <Avatar name={profile.display_name} uri={profile.picture} size={84} />
           <View style={{ flexDirection: "row", alignItems: "center", marginTop: spacing.md, gap: spacing.sm }}>
             <Txt variant="title">{profile.display_name}</Txt>
-            {profile.is_elder ? <Crown size={18} color={colors.warning} weight="fill" /> : null}
+            
           </View>
           {profile.bio ? <Txt variant="bodySm" center style={{ marginTop: spacing.xs }}>{profile.bio}</Txt> : null}
           {profile.intention ? (
@@ -83,7 +82,7 @@ export default function UserProfile() {
         </View>
 
         <View style={styles.stats}>
-          <St value={profile.streak_longest} label="Best streak" />
+          <St value={`${profile.growth?.glyph ?? ""}`} label={profile.growth?.label ?? "A seed"} />
           <St value={profile.total_days} label="Days" />
           <St value={profile.followers} label="Followers" />
         </View>
