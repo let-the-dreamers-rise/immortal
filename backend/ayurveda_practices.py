@@ -282,7 +282,7 @@ AYURVEDA_PRACTICES = [
         "evidence_note": (
             "Saline nasal irrigation has reasonable trial support for chronic rhinosinusitis symptoms and "
             "is recommended in several clinical guidelines — a rare case here of a traditional practice "
-            "adopted more or less intact by conventional medicine."
+            "adopted more or less intact by conventional medicine. That support is specific to sinus symptoms in people who have them; no trial extends it to general wellbeing."
         ),
     },
     {

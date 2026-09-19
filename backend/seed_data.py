@@ -76,7 +76,7 @@ PRACTICES = [
             "Move through one or all five, letting the movement be a little playful — this is a frolic.",
         ],
         "safety_note": None,
-        "evidence_note": "Attributed to physician Hua Tuo. Trials support the full five-animal set for stable COPD and blood pressure in older adults; every animal is traditionally tied to an organ via the Five Elements.",
+        "evidence_note": "Attributed to physician Hua Tuo. Trials support the full five-animal set for stable COPD and blood pressure in older adults; every animal is traditionally tied to an organ via the Five Elements, but all studies test the set as a whole, so nothing supports any single animal on its own, and the populations studied were specific rather than general",
     },
     {
         "practice_id": "shun-hu-xi",
@@ -237,7 +237,7 @@ PRACTICES = [
         "title": "Jing — Essence Conservation",
         "tradition": "dao",
         "category": "Life Nourishing",
-        "difficulty": "intermediate",
+        "difficulty": "beginner",
         "time_min": 0,
         "origin_text": "Daoist Three Treasures (Jing, Qi, Shen)",
         "historical_context": "Daoists regard Jing (essence) as a finite root of vitality, to be conserved through moderation rather than spent recklessly.",
@@ -422,7 +422,9 @@ PRACTICES = [
             "Notice sensation without forcing or chasing it.",
             "Close by standing still and feeling the whole body.",
         ],
-        "safety_note": None,
+        "safety_note": (
+            "Slow does not mean safe: hold no position that produces sharp or radiating pain, and work within a comfortable range. Take care or seek guidance with joint problems, disc injury, uncontrolled blood pressure, or balance difficulty."
+        ),
     },
     {
         "practice_id": "deep-body-awareness",
@@ -441,7 +443,9 @@ PRACTICES = [
             "Do not fix or change anything \u2014 only listen.",
             "Rest in whole-body awareness before finishing.",
         ],
-        "safety_note": None,
+        "safety_note": (
+            "Turning attention onto bodily sensation can amplify discomfort or provoke anxiety in some people. If the practice becomes distressing rather than merely uncomfortable, open the eyes and stop. Speak to a professional first if you have a history of panic or trauma."
+        ),
     },
     {
         "practice_id": "dantian-breathing",
@@ -498,7 +502,9 @@ PRACTICES = [
             "Rest where the three feel unified and calm.",
             "Carry a little of that stillness into the day.",
         ],
-        "safety_note": None,
+        "safety_note": (
+            "An integrative practice that draws on the others, so carry over their cautions — no breath retention, and stop if stillness turns to agitation. Speak to a professional first if you have a history of psychosis or dissociation."
+        ),
     },
     {
         "practice_id": "extended-sitting",
@@ -517,7 +523,9 @@ PRACTICES = [
             "Let the session end softly, without abruptness.",
             "Reflect briefly on how the day might hold this stillness.",
         ],
-        "safety_note": None,
+        "safety_note": (
+            "Long, still sittings are where difficult experiences are most likely to surface — anxiety, disorientation, a sense of detachment, or re-emerging memories. This is documented and it is not rare. Build the duration slowly rather than jumping to the full length, stop if it turns distressing, and speak to a qualified professional before extended practice if you have a history of psychosis, dissociation, or severe trauma."
+        ),
     },
 ]
 
