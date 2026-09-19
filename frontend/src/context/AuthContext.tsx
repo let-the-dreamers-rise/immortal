@@ -18,6 +18,9 @@ export type User = {
   path_choice?: string | null;
   bio?: string | null;
   onboarded: boolean;
+  reminder_enabled?: boolean;
+  reminder_hour?: number;
+  reminder_minute?: number;
   created_at?: string;
 };
 
@@ -82,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Bootstrap: process any inbound session_id first, else restore token.
   useEffect(() => {
-    let sub: Linking.EventSubscription | undefined;
+    let sub: ReturnType<typeof Linking.addEventListener> | undefined;
     (async () => {
       try {
         if (Platform.OS === "web") {

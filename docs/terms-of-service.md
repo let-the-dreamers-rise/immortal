@@ -144,7 +144,7 @@ You agree to indemnify us against claims, losses, and reasonable legal costs ari
 
 ## 11. Suspension and termination
 
-**You** may stop using Essence Path at any time and delete your account by writing to **[SUPPORT CONTACT EMAIL]**.
+**You** may stop using Essence Path at any time and delete your account from within the app, under Settings → Delete account. It takes effect immediately and cannot be undone.
 
 **We** may suspend or terminate your account if you break these terms, if we are legally required to, or if keeping it open would put other users at risk. Except where that is impractical or unsafe, we will tell you why and give you a chance to respond. You can ask us to review a termination by writing to the same address.
 

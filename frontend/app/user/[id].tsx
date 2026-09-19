@@ -16,7 +16,6 @@ type Profile = {
   intention?: string | null;
   growth: { glyph: string; label: string; days: number };
   total_days: number;
-  total_days: number;
   followers: number;
   following: number;
   is_following: boolean;
@@ -82,7 +81,7 @@ export default function UserProfile() {
         </View>
 
         <View style={styles.stats}>
-          <St value={`${profile.growth?.glyph ?? ""}`} label={profile.growth?.label ?? "A seed"} />
+          <St value={profile.growth?.glyph ?? "種"} label={profile.growth?.label ?? "A seed"} />
           <St value={profile.total_days} label="Days" />
           <St value={profile.followers} label="Followers" />
         </View>
@@ -124,7 +123,7 @@ export default function UserProfile() {
   );
 }
 
-function St({ value, label }: { value: number; label: string }) {
+function St({ value, label }: { value: number | string; label: string }) {
   return (
     <View style={{ alignItems: "center", flex: 1 }}>
       <Txt style={{ fontFamily: fonts.displayBold, fontSize: 24, color: colors.onSurface }}>{value}</Txt>

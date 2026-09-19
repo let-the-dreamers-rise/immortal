@@ -316,6 +316,50 @@ async def logout(authorization: Optional[str] = Header(default=None)):
     return {"ok": True}
 
 
+
+class DeleteAccountIn(BaseModel):
+    confirm: str
+
+
+@api.delete("/account")
+async def delete_account(body: DeleteAccountIn, user: dict = Depends(get_current_user)):
+    """Erase the account and everything attached to it.
+
+    Required by Apple for any app with sign-up, and by the DPDP Act and GDPR
+    as a right to erasure. The privacy policy describes this as complete
+    deletion, so it deletes rather than anonymises — a partial purge would
+    make that document untrue.
+
+    Confirmation is a typed string rather than a password because Google
+    accounts have no password to re-enter.
+    """
+    if body.confirm.strip().upper() != "DELETE":
+        raise HTTPException(status_code=400, detail="Type DELETE to confirm.")
+
+    uid = user["user_id"]
+
+    # Meetups this user hosts go with them: leaving them listed would advertise
+    # a gathering with no host to attendees who cannot be told it is off.
+    hosted = await db.meetups.find({"host_id": uid}, {"_id": 0, "meetup_id": 1}).to_list(500)
+    hosted_ids = [m["meetup_id"] for m in hosted]
+    if hosted_ids:
+        await db.rsvps.delete_many({"meetup_id": {"$in": hosted_ids}})
+        await db.meetups.delete_many({"meetup_id": {"$in": hosted_ids}})
+
+    await db.rsvps.delete_many({"user_id": uid})
+    await db.comments.delete_many({"user_id": uid})
+    await db.logs.delete_many({"user_id": uid})
+    await db.path_progress.delete_many({"user_id": uid})
+    # Both directions: their follows, and other people's follows of them.
+    await db.follows.delete_many({"$or": [{"follower_id": uid}, {"following_id": uid}]})
+    await db.users.delete_one({"user_id": uid})
+    # Sessions last, so this request itself stays authenticated to the end.
+    await db.user_sessions.delete_many({"user_id": uid})
+
+    logger.info("account deleted: %s", uid)
+    return {"ok": True}
+
+
 @api.post("/auth/onboarding")
 async def onboarding(body: OnboardingIn, user: dict = Depends(get_current_user)):
     if body.path_choice not in ("dao", "ayurveda", "both"):

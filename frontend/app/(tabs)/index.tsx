@@ -17,6 +17,7 @@ const SIDE = (width - spacing.xl * 2 - CENTER) / 2;
 
 type Stage = {
   order: number;
+  year: number;
   months: string;
   title: string;
   chinese: string;

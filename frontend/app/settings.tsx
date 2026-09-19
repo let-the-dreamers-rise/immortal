@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Linking, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X, SignOut, Bell } from "phosphor-react-native";
+import { X, SignOut, Bell, Trash } from "phosphor-react-native";
 
 import { Button, Chip, Divider, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
@@ -23,6 +23,8 @@ const TIME_PRESETS = [
 export default function Settings() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [confirmDelete, setConfirmDelete] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const { user, setUser, logout } = useAuth();
   const [name, setName] = useState(user?.display_name || "");
   const [bio, setBio] = useState(user?.bio || "");
@@ -76,6 +78,18 @@ export default function Settings() {
       setSaved(true);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await apiFetch("/account", { method: "DELETE", body: { confirm: confirmDelete } });
+      await logout();
+    } catch (e: any) {
+      Alert.alert("Could not delete", e?.message ?? "Please try again.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -152,6 +166,39 @@ export default function Settings() {
         <Pressable onPress={logout} style={styles.logout} testID="settings-logout-button">
           <SignOut size={20} color={colors.error} weight="regular" />
           <Txt variant="label" color={colors.error} style={{ marginLeft: spacing.sm }}>Sign out</Txt>
+        </Pressable>
+
+        <Divider style={{ marginVertical: spacing.xxl }} />
+
+        <Txt variant="label" color={colors.error}>Delete account</Txt>
+        <Txt variant="caption" style={{ marginTop: spacing.xs, lineHeight: 18 }}>
+          This erases your profile, every reflection you have written, your comments, the circles you
+          host, and who you follow. It cannot be undone. Anything you shared publicly may already have
+          been read by others.
+        </Txt>
+        <TextInput
+          value={confirmDelete}
+          onChangeText={setConfirmDelete}
+          placeholder="Type DELETE to confirm"
+          placeholderTextColor={colors.muted}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          style={styles.input}
+          testID="settings-delete-confirm-input"
+        />
+        <Pressable
+          onPress={deleteAccount}
+          disabled={confirmDelete.trim().toUpperCase() !== "DELETE" || deleting}
+          style={[
+            styles.logout,
+            { opacity: confirmDelete.trim().toUpperCase() === "DELETE" && !deleting ? 1 : 0.4 },
+          ]}
+          testID="settings-delete-account-button"
+        >
+          <Trash size={20} color={colors.error} weight="regular" />
+          <Txt variant="label" color={colors.error} style={{ marginLeft: spacing.sm }}>
+            {deleting ? "Deleting…" : "Delete my account"}
+          </Txt>
         </Pressable>
 
         <Txt variant="caption" center style={{ marginTop: spacing.xxl, lineHeight: 16 }}>

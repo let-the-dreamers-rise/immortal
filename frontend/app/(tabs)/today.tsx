@@ -57,7 +57,7 @@ function duration(p: Practice) {
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const [data, setData] = useState<Today | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 

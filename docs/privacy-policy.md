@@ -16,7 +16,7 @@ Questions, requests, or complaints: **[PRIVACY CONTACT EMAIL]**.
 - We do not sell your data, and we do not run advertising.
 - Your journal is **private by default**. Entries become visible to others only when you explicitly mark them public.
 - Your journal entries may reveal information about your health. We treat them accordingly, and you should know that before you write.
-- You can export or delete everything by writing to us.
+- You can delete everything yourself, in the app, at any time.
 
 ---
 
@@ -43,7 +43,7 @@ Questions, requests, or complaints: **[PRIVACY CONTACT EMAIL]**.
 | What | Why | Kept for |
 |---|---|---|
 | Session token | Keeps you signed in | 30 days, then it expires and is deleted |
-| Streaks, days practised, milestones, Elder status | Computed from your entries and shown on your profile | While your account exists |
+| Days practised, and the growth stage derived from them | Computed from your entries and shown on your profile | While your account exists |
 | **IP address**, on sign-in and registration attempts | To rate-limit brute-force and credential-stuffing attacks. This is a security measure and nothing else | **Automatically deleted after 5 minutes** |
 
 ### Device location
@@ -88,7 +88,7 @@ Essence Path is not a medical service and we are not your healthcare provider. N
 
 ### Other users
 
-- Your display name, profile photo, bio, chosen path, streak, and Elder status appear on your public profile and in the practitioners list.
+- Your display name, profile photo, bio, chosen path, growth stage and the date you last practised appear on your public profile and in the practitioners list.
 - Journal entries you mark public appear in the community feed with your name attached.
 - Comments you post are visible to anyone who can see the entry they are on.
 - If you host or join a practice circle, other attendees see your display name, and the location you gave for the circle is visible to anyone who can see it.
@@ -120,7 +120,7 @@ Our infrastructure providers operate in multiple countries, so your data may be 
 
 | Data | Retention |
 |---|---|
-| Account details, journal entries, comments, circles | Until you delete your account |
+| Account details, journal entries, comments, circles | Until you delete your account, which you can do yourself at any time |
 | Deleted journal entries | Marked deleted and hidden immediately; purged from backups within 30 days |
 | Session tokens | 30 days, then automatically deleted |
 | Sign-in attempt records with IP | 5 minutes, then automatically deleted |
@@ -139,9 +139,11 @@ Whatever country you are in, you can ask us to:
 - **Withdraw consent** you previously gave, such as for location or reminders
 - **Complain** to us, and escalate if we handle it badly
 
-**To exercise any of these, email [PRIVACY CONTACT EMAIL].** We will respond within 30 days.
+**You can delete your account yourself, in the app**, under Settings → Delete account. It takes effect immediately.
 
-Deleting your account removes your profile, journal entries, comments, RSVPs, and the circles you hosted. Note that comments you left on other people's entries may remain visible as anonymised text where removing them would break the conversation, and anything you published publicly may already have been seen or copied by others.
+**For anything else — access, correction, export, or withdrawing consent — email [PRIVACY CONTACT EMAIL].** We will respond within 30 days.
+
+Deleting your account erases your profile, every journal entry, your comments, your RSVPs, who you follow and who follows you, and any practice circles you were hosting. Nothing is anonymised and kept; it is removed. Note that anything you published publicly may already have been seen or copied by others, and deletion here cannot reach that.
 
 **If you are in India**, the Digital Personal Data Protection Act, 2023 gives you these rights, plus the right to nominate someone to exercise them on your behalf if you die or become incapacitated. You may complain to us first at the address above; if unsatisfied, you may approach the Data Protection Board of India.
 
