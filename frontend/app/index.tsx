@@ -9,7 +9,7 @@ export default function Index() {
         長生
       </Txt>
       <Txt variant="subtitle" center style={{ marginTop: spacing.sm, marginBottom: spacing.xxl }}>
-        Essence Path
+        Immortal
       </Txt>
       <Loading />
     </View>

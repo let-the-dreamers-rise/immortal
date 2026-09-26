@@ -54,6 +54,9 @@ function RootNavigator() {
       <Stack.Screen name="log/new" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
       <Stack.Screen name="meetup/new" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
       <Stack.Screen name="settings" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+      <Stack.Screen name="paywall" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+      <Stack.Screen name="lineage/[id]" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="lineage/new" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
     </Stack>
   );
 }

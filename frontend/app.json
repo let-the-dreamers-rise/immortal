@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "Essence Path",
-    "slug": "frontend",
+    "name": "Immortal",
+    "slug": "immortal",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "essencepath",
+    "scheme": "immortal",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.essencepath.qploc0",
+      "bundleIdentifier": "com.letthedreamersrise.immortal",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Find practice circles happening near you"
       }
@@ -21,11 +21,12 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.essencepath.qploc0",
+      "package": "com.letthedreamersrise.immortal",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "com.android.vending.BILLING"
       ]
     },
     "web": {
@@ -44,7 +45,8 @@
           "backgroundColor": "#000000"
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true

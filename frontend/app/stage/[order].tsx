@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -49,6 +49,9 @@ export default function StageDetail() {
     try {
       await apiFetch(`/path/stages/${order}/start`, { method: "POST" });
       await load();
+    } catch (e: any) {
+      if (e?.status === 402) router.push("/paywall");
+      else Alert.alert("Could not begin", e?.message ?? "Please try again.");
     } finally {
       setBusy(false);
     }

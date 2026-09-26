@@ -71,6 +71,21 @@ and build a real-world community — framed strictly as historical exploration, 
 - Verified: teachings + enriched practice content via curl; Teachings screen + Ba Duan Jin detail via screenshots;
   core flows (auth, path, library) regression-checked; lint clean.
 
+## Implemented (2026-09, iteration 4 — auth, RevenueCat, lineages, APK)
+- Auth: 8-char password rule enforced on both sides; show/hide password; change/add password (revokes other
+  sessions); sign out on all devices; forgot-password by 6-digit email code (needs SMTP_*); native Google
+  sign-in via ID token (/api/auth/google, needs GOOGLE_CLIENT_IDS + EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID).
+  The Emergent Google flow was removed from the app (the Emergent host is gone).
+- RevenueCat "Inner Chamber" (内室) membership, entitlement `pro`: paywall screen (/paywall), restore,
+  customer center, Settings section. Server verifies via REVENUECAT_SECRET_KEY (/api/billing/sync) and
+  webhook (/api/billing/webhook, REVENUECAT_WEBHOOK_AUTH). Gates: Year 2 stages and authoring >1 lineage.
+  Without the secret key gates are not enforced server-side.
+- Lineages (传承): members record long-horizon practices, others take them up, log days (accumulated, not
+  streaks), leave field notes (observation/adjustment/caution/question) and branch them. Five founding
+  lineages seeded by the "Immortal Archive" system user. Community tab opens on Lineages.
+- Deploy: backend/Dockerfile + requirements.deploy.txt; frontend eas.json (preview = APK).
+- Tests: backend/tests_local (27 in-process tests on mongomock) — `pytest tests_local -n 0`.
+
 ## Still open
 - Roll named sub-forms / evidence tiers / safety notes across ALL remaining practices (Yijinjing, Liuzijue six
   sounds, Taixi caution, etc. from dossier §3–5) — partially done.

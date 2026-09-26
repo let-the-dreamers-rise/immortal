@@ -26,6 +26,10 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 from starlette.middleware.cors import CORSMiddleware
 
+import auth_extra
+import billing
+import lineages
+from seed_lineages import ARCHIVE_USER, FOUNDING_LINEAGES
 from today import build_today, growth_for
 from seed_data import (
     ILLUSTRATION_STYLE,
@@ -70,6 +74,8 @@ def init_storage() -> Optional[str]:
     global _storage_key
     if _storage_key:
         return _storage_key
+    if not EMERGENT_KEY:
+        return None
     try:
         resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
         resp.raise_for_status()
@@ -143,6 +149,10 @@ def public_user(u: dict) -> dict:
         "reminder_hour": u.get("reminder_hour", 8),
         "reminder_minute": u.get("reminder_minute", 0),
         "created_at": u.get("created_at"),
+        "auth_provider": u.get("auth_provider", "email"),
+        "has_password": bool(u.get("hashed_password")),
+        "is_premium": billing.user_is_premium(u),
+        "premium_expires_at": u.get("premium_expires_at"),
     }
 
 
@@ -278,29 +288,36 @@ async def google_session(body: SessionIn):
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     data = resp.json()
     email = (data.get("email") or "").lower()
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        user = existing
-        if not user.get("picture") and data.get("picture"):
-            await db.users.update_one({"user_id": user["user_id"]}, {"$set": {"picture": data.get("picture")}})
-            user["picture"] = data.get("picture")
-    else:
-        user = {
-            "user_id": new_user_id(),
-            "email": email,
-            "display_name": (data.get("name") or email.split("@")[0]).strip(),
-            "hashed_password": None,
-            "auth_provider": "google",
-            "picture": data.get("picture"),
-            "bio": None,
-            "intention": None,
-            "path_choice": None,
-            "onboarded": False,
-            "created_at": now_utc(),
-        }
-        await db.users.insert_one(user)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    user = await upsert_oauth_user(email, data.get("name"), data.get("picture"), "google")
     token = await create_session(user["user_id"])
     return {"session_token": token, "user": public_user(user)}
+
+
+async def upsert_oauth_user(email: str, name: Optional[str], picture: Optional[str], provider: str) -> dict:
+    """Find the account for a verified OAuth email, creating it on first sign-in."""
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        if not existing.get("picture") and picture:
+            await db.users.update_one({"user_id": existing["user_id"]}, {"$set": {"picture": picture}})
+            existing = {**existing, "picture": picture}
+        return existing
+    user = {
+        "user_id": new_user_id(),
+        "email": email,
+        "display_name": (name or email.split("@")[0]).strip()[:40],
+        "hashed_password": None,
+        "auth_provider": provider,
+        "picture": picture,
+        "bio": None,
+        "intention": None,
+        "path_choice": None,
+        "onboarded": False,
+        "created_at": now_utc(),
+    }
+    await db.users.insert_one(dict(user))
+    return user
 
 
 @api.get("/auth/me")
@@ -352,6 +369,8 @@ async def delete_account(body: DeleteAccountIn, user: dict = Depends(get_current
     await db.path_progress.delete_many({"user_id": uid})
     # Both directions: their follows, and other people's follows of them.
     await db.follows.delete_many({"$or": [{"follower_id": uid}, {"following_id": uid}]})
+    await lineages.erase_user(db, uid)
+    await db.password_resets.delete_many({"email": user.get("email")})
     await db.users.delete_one({"user_id": uid})
     # Sessions last, so this request itself stays authenticated to the end.
     await db.user_sessions.delete_many({"user_id": uid})
@@ -579,6 +598,9 @@ async def start_stage(order: int, user: dict = Depends(get_current_user)):
     info = stage_status(order, progress)
     if info["state"] == "locked":
         raise HTTPException(status_code=403, detail="Complete the previous stage first")
+    if s.get("year", 1) >= 2:
+        # Year 2 (Nei Gong) is the Inner Chamber path.
+        billing.premium_guard(user)
     key = f"stages.{order}"
     existing = progress.get("stages", {}).get(str(order), {})
     if not existing.get("started_at"):
@@ -1087,6 +1109,26 @@ async def root():
     return {"message": "Immortality — Dao Longevity API"}
 
 
+@api.get("/health")
+async def health():
+    await db.command("ping")
+    return {"ok": True}
+
+
+api.include_router(
+    auth_extra.build_router(
+        db,
+        get_current_user,
+        hash_password=hash_password,
+        verify_password=verify_password,
+        create_session=create_session,
+        rate_limit=enforce_auth_rate_limit,
+        upsert_oauth_user=upsert_oauth_user,
+        public_user=public_user,
+    )
+)
+api.include_router(billing.build_router(db, get_current_user, public_user))
+api.include_router(lineages.build_router(db, get_current_user))
 app.include_router(api)
 
 # Origins come from CORS_ORIGINS (comma-separated) in deployed environments.
@@ -1116,6 +1158,22 @@ async def seed_content():
             doc["illustration_path"] = None
             await db.practices.insert_one(doc)
     logger.info("Seeded %d practices", len(PRACTICES))
+
+    await db.users.update_one(
+        {"user_id": ARCHIVE_USER["user_id"]},
+        {"$setOnInsert": {**ARCHIVE_USER, "created_at": now_utc()}},
+        upsert=True,
+    )
+    for lin in FOUNDING_LINEAGES:
+        await db.lineages.update_one(
+            {"lineage_id": lin["lineage_id"]},
+            {
+                "$set": {**lin, "author_id": ARCHIVE_USER["user_id"], "parent_id": None},
+                "$setOnInsert": {"created_at": now_utc(), "deleted_at": None},
+            },
+            upsert=True,
+        )
+    logger.info("Seeded %d founding lineages", len(FOUNDING_LINEAGES))
 
 
 async def generate_illustrations():
@@ -1155,19 +1213,41 @@ async def generate_illustrations():
     logger.info("Illustration generation pass complete")
 
 
+INDEXES = [
+    ("users", "email", {"unique": True}),
+    ("users", "user_id", {"unique": True}),
+    ("user_sessions", "session_token", {"unique": True}),
+    ("user_sessions", "expires_at", {"expireAfterSeconds": 0}),
+    ("logs", [("user_id", 1), ("created_at", -1)], {}),
+    ("follows", [("follower_id", 1), ("following_id", 1)], {"unique": True}),
+    ("comments", [("log_id", 1), ("created_at", 1)], {}),
+    ("rsvps", [("meetup_id", 1), ("user_id", 1)], {"unique": True}),
+    ("meetups", [("starts_at", 1)], {}),
+    ("auth_attempts", "key", {}),
+    ("auth_attempts", "at", {"expireAfterSeconds": AUTH_WINDOW_SECONDS}),
+    ("lineages", "lineage_id", {"unique": True}),
+    ("lineages", "parent_id", {}),
+    ("lineage_members", [("lineage_id", 1), ("user_id", 1)], {"unique": True}),
+    ("lineage_members", "user_id", {}),
+    ("lineage_notes", [("lineage_id", 1), ("created_at", -1)], {}),
+    ("password_resets", "email", {}),
+    ("password_resets", "expires_at", {"expireAfterSeconds": 0}),
+]
+
+
+async def ensure_indexes():
+    # One failure must not stop startup: MongoDB-compatible hosts (e.g.
+    # Firestore) support most index options but not always every one.
+    for coll, keys, opts in INDEXES:
+        try:
+            await db[coll].create_index(keys, **opts)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("index %s.%s skipped: %s", coll, keys, e)
+
+
 @app.on_event("startup")
 async def on_startup():
-    await db.users.create_index("email", unique=True)
-    await db.users.create_index("user_id", unique=True)
-    await db.user_sessions.create_index("session_token", unique=True)
-    await db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
-    await db.logs.create_index([("user_id", 1), ("created_at", -1)])
-    await db.follows.create_index([("follower_id", 1), ("following_id", 1)], unique=True)
-    await db.comments.create_index([("log_id", 1), ("created_at", 1)])
-    await db.rsvps.create_index([("meetup_id", 1), ("user_id", 1)], unique=True)
-    await db.meetups.create_index([("starts_at", 1)])
-    await db.auth_attempts.create_index("key")
-    await db.auth_attempts.create_index("at", expireAfterSeconds=AUTH_WINDOW_SECONDS)
+    await ensure_indexes()
     await seed_content()
     init_storage()
     asyncio.create_task(generate_illustrations())

@@ -11,6 +11,7 @@ import { Avatar, Button, EmptyState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, fonts, IMAGES, radius, spacing } from "@/src/theme";
+import { LineagesPanel } from "@/src/lineages/LineagesPanel";
 
 type Stats = {
   growth: { glyph: string; label: string; days: number };
@@ -57,7 +58,8 @@ export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [tab, setTab] = useState<"practitioners" | "feed" | "meetups">("practitioners");
+  const [tab, setTab] = useState<"lineages" | "practitioners" | "feed" | "meetups">("lineages");
+  const [reloadKey, setReloadKey] = useState(0);
   const [stats, setStats] = useState<Stats | null>(null);
   const [people, setPeople] = useState<Practitioner[]>([]);
   const [feed, setFeed] = useState<FeedLog[]>([]);
@@ -82,6 +84,7 @@ export default function CommunityScreen() {
       setStats(s.stats);
       setPeople(p.practitioners);
       setFeed(f.logs);
+      setReloadKey((k) => k + 1);
       await loadMeetups(coords);
     } finally {
       setLoading(false);
@@ -168,12 +171,15 @@ export default function CommunityScreen() {
 
           {/* Tabs */}
           <View style={styles.segment}>
+            <SegBtn label="Lineages" active={tab === "lineages"} onPress={() => setTab("lineages")} testID="community-tab-lineages" />
             <SegBtn label="People" active={tab === "practitioners"} onPress={() => setTab("practitioners")} testID="community-tab-practitioners" />
             <SegBtn label="Logs" active={tab === "feed"} onPress={() => setTab("feed")} testID="community-tab-feed" />
             <SegBtn label="Meetups" active={tab === "meetups"} onPress={() => setTab("meetups")} testID="community-tab-meetups" />
           </View>
 
-          {tab === "practitioners" ? (
+          {tab === "lineages" ? (
+            <LineagesPanel reloadKey={reloadKey} />
+          ) : tab === "practitioners" ? (
             people.length === 0 ? (
               <EmptyStateBlock title="No fellow travelers yet" body="As others join and begin their path, you'll find them here." />
             ) : (

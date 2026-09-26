@@ -4,34 +4,73 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Eye, EyeSlash } from "phosphor-react-native";
 
 import { Button, Txt } from "@/src/components/ui";
 import { useAuth } from "@/src/context/AuthContext";
-import { ApiError } from "@/src/api/client";
 import { colors, fonts, IMAGES, radius, spacing } from "@/src/theme";
+
+type Mode = "login" | "register" | "forgot" | "reset";
+
+const MIN_PASSWORD = 8;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const COPY: Record<Mode, { title: string; sub: string; cta: string }> = {
+  register: { title: "Begin your journey", sub: "Choose a name others will see — it can be a pseudonym.", cta: "Create account" },
+  login: { title: "Welcome back", sub: "Return to your practice.", cta: "Sign in" },
+  forgot: { title: "Reset your password", sub: "We'll email you a six-digit code.", cta: "Send code" },
+  reset: { title: "Enter your code", sub: "Check your inbox, then choose a new password.", cta: "Set new password" },
+};
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
-  const { register, login, signInWithGoogle } = useAuth();
-  const [mode, setMode] = useState<"login" | "register">("register");
+  const { register, login, signInWithGoogle, requestPasswordReset, resetPassword, providers } = useAuth();
+  const [mode, setMode] = useState<Mode>("register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const switchTo = (next: Mode) => {
+    setError(null);
+    setNotice(null);
+    setMode(next);
+  };
+
+  const validate = (): string | null => {
+    if (!EMAIL_RE.test(email.trim())) return "Enter a valid email address.";
+    if (mode === "register" && name.trim().length < 2) return "Choose a display name (2+ characters).";
+    if ((mode === "register" || mode === "reset") && password.length < MIN_PASSWORD)
+      return `Use at least ${MIN_PASSWORD} characters for your password.`;
+    if (mode === "login" && !password) return "Enter your password.";
+    if (mode === "reset" && !/^\d{6}$/.test(code.trim())) return "The code is six digits.";
+    return null;
+  };
 
   const submit = async () => {
     setError(null);
+    setNotice(null);
+    const invalid = validate();
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
     setBusy(true);
     try {
-      if (mode === "register") {
-        if (name.trim().length < 2) throw new ApiError(400, "Choose a display name (2+ characters).");
-        await register(email.trim(), password, name.trim());
-      } else {
-        await login(email.trim(), password);
-      }
-    } catch (e: any) {
-      setError(e?.message || "Something went wrong");
+      const e = email.trim();
+      if (mode === "register") await register(e, password, name.trim());
+      else if (mode === "login") await login(e, password);
+      else if (mode === "forgot") {
+        await requestPasswordReset(e);
+        setPassword("");
+        setMode("reset");
+        setNotice("If an account uses that email, a code is on its way.");
+      } else await resetPassword(e, code.trim(), password);
+    } catch (err: any) {
+      setError(err?.message || "Something went wrong");
     } finally {
       setBusy(false);
     }
@@ -42,12 +81,15 @@ export default function AuthScreen() {
     setBusy(true);
     try {
       await signInWithGoogle();
-    } catch (e: any) {
-      setError(e?.message || "Google sign-in failed");
+    } catch (err: any) {
+      setError(err?.message || "Google sign-in failed");
     } finally {
       setBusy(false);
     }
   };
+
+  const copy = COPY[mode];
+  const needsPassword = mode !== "forgot";
 
   return (
     <View style={styles.container}>
@@ -74,11 +116,9 @@ export default function AuthScreen() {
         bottomOffset={24}
         keyboardShouldPersistTaps="handled"
       >
-        <Txt variant="title">{mode === "register" ? "Begin your journey" : "Welcome back"}</Txt>
+        <Txt variant="title">{copy.title}</Txt>
         <Txt variant="bodySm" style={{ marginTop: spacing.xs, marginBottom: spacing.lg }}>
-          {mode === "register"
-            ? "Choose a name others will see — it can be a pseudonym."
-            : "Return to your practice."}
+          {copy.sub}
         </Txt>
 
         {mode === "register" && (
@@ -89,6 +129,7 @@ export default function AuthScreen() {
             placeholder="e.g. River Walker"
             testID="auth-name-input"
             autoCapitalize="words"
+            maxLength={40}
           />
         )}
         <Field
@@ -98,52 +139,69 @@ export default function AuthScreen() {
           placeholder="you@example.com"
           keyboardType="email-address"
           autoCapitalize="none"
+          autoComplete="email"
           testID="auth-email-input"
         />
-        <Field
-          label="Password"
-          value={password}
-          onChangeText={setPassword}
-          placeholder="At least 6 characters"
-          secureTextEntry
-          autoCapitalize="none"
-          testID="auth-password-input"
-        />
+        {mode === "reset" && (
+          <Field
+            label="Six-digit code"
+            value={code}
+            onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
+            placeholder="123456"
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            testID="auth-code-input"
+          />
+        )}
+        {needsPassword && (
+          <PasswordField
+            label={mode === "reset" ? "New password" : "Password"}
+            value={password}
+            onChangeText={setPassword}
+            placeholder={mode === "login" ? "Your password" : `At least ${MIN_PASSWORD} characters`}
+            testID="auth-password-input"
+          />
+        )}
 
+        {mode === "login" && providers.password_reset && (
+          <Pressable onPress={() => switchTo("forgot")} style={{ alignSelf: "flex-end" }} testID="auth-forgot-link">
+            <Txt variant="bodySm" color={colors.brandPrimary} weight="semi">Forgot password?</Txt>
+          </Pressable>
+        )}
+
+        {notice ? (
+          <Txt variant="bodySm" color={colors.success} style={{ marginTop: spacing.sm }} testID="auth-notice">
+            {notice}
+          </Txt>
+        ) : null}
         {error ? (
           <Txt variant="bodySm" color={colors.error} style={{ marginTop: spacing.sm }} testID="auth-error">
             {error}
           </Txt>
         ) : null}
 
-        <Button
-          label={mode === "register" ? "Create account" : "Sign in"}
-          onPress={submit}
-          loading={busy}
-          testID="auth-submit-button"
-          style={{ marginTop: spacing.lg }}
-        />
+        <Button label={copy.cta} onPress={submit} loading={busy} testID="auth-submit-button" style={{ marginTop: spacing.lg }} />
 
-        <View style={styles.dividerRow}>
-          <View style={styles.line} />
-          <Txt variant="caption" style={{ marginHorizontal: spacing.md }}>OR</Txt>
-          <View style={styles.line} />
-        </View>
-
-        <Button label="Continue with Google" variant="ghost" onPress={google} testID="auth-google-button" />
+        {(mode === "login" || mode === "register") && providers.google ? (
+          <>
+            <View style={styles.dividerRow}>
+              <View style={styles.line} />
+              <Txt variant="caption" style={{ marginHorizontal: spacing.md }}>OR</Txt>
+              <View style={styles.line} />
+            </View>
+            <Button label="Continue with Google" variant="ghost" onPress={google} testID="auth-google-button" />
+          </>
+        ) : null}
 
         <Pressable
-          onPress={() => {
-            setError(null);
-            setMode(mode === "register" ? "login" : "register");
-          }}
+          onPress={() => switchTo(mode === "register" ? "login" : mode === "login" ? "register" : "login")}
           style={{ marginTop: spacing.xl, alignItems: "center" }}
           testID="auth-toggle-mode"
         >
           <Txt variant="bodySm">
-            {mode === "register" ? "Already walking the path? " : "New here? "}
+            {mode === "register" ? "Already walking the path? " : mode === "login" ? "New here? " : "Remembered it? "}
             <Txt variant="bodySm" color={colors.brandPrimary} weight="semi">
-              {mode === "register" ? "Sign in" : "Create an account"}
+              {mode === "login" ? "Create an account" : "Sign in"}
             </Txt>
           </Txt>
         </Pressable>
@@ -157,20 +215,43 @@ export default function AuthScreen() {
   );
 }
 
-function Field({
-  label,
-  testID,
-  ...props
-}: React.ComponentProps<typeof TextInput> & { label: string; testID?: string }) {
+type FieldProps = React.ComponentProps<typeof TextInput> & { label: string; testID?: string };
+
+function Field({ label, testID, ...props }: FieldProps) {
   return (
     <View style={{ marginBottom: spacing.md }}>
       <Txt variant="caption" style={{ marginBottom: spacing.xs }}>{label.toUpperCase()}</Txt>
-      <TextInput
-        {...props}
-        testID={testID}
-        placeholderTextColor={colors.muted}
-        style={styles.input}
-      />
+      <TextInput {...props} testID={testID} placeholderTextColor={colors.muted} style={styles.input} />
+    </View>
+  );
+}
+
+function PasswordField({ label, testID, ...props }: FieldProps) {
+  const [visible, setVisible] = useState(false);
+  const Icon = visible ? EyeSlash : Eye;
+  return (
+    <View style={{ marginBottom: spacing.md }}>
+      <Txt variant="caption" style={{ marginBottom: spacing.xs }}>{label.toUpperCase()}</Txt>
+      <View>
+        <TextInput
+          {...props}
+          testID={testID}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholderTextColor={colors.muted}
+          style={[styles.input, { paddingRight: 48 }]}
+        />
+        <Pressable
+          onPress={() => setVisible((v) => !v)}
+          style={styles.eye}
+          hitSlop={8}
+          accessibilityLabel={visible ? "Hide password" : "Show password"}
+          testID={`${testID}-toggle`}
+        >
+          <Icon size={20} color={colors.muted} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -191,6 +272,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.onSurface,
   },
+  eye: { position: "absolute", right: spacing.lg, top: 0, bottom: 0, justifyContent: "center" },
   dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: spacing.xl },
   line: { flex: 1, height: 1, backgroundColor: colors.divider },
   disclaimer: { marginTop: spacing.xl, lineHeight: 16, paddingHorizontal: spacing.md },

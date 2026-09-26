@@ -1,0 +1,13 @@
+# Runtime-only dependencies for the deployed API (Cloud Run / Docker).
+# requirements.txt also lists dev tools and the Emergent SDK, which is only
+# available inside Emergent and is imported lazily when EMERGENT_LLM_KEY is set.
+fastapi==0.110.1
+uvicorn[standard]==0.25.0
+motor==3.3.1
+pymongo==4.6.3
+pydantic>=2.6.4
+email-validator>=2.2.0
+bcrypt==4.1.3
+httpx>=0.28.1
+requests>=2.31.0
+python-dotenv>=1.0.1

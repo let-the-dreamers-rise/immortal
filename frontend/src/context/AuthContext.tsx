@@ -1,12 +1,9 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
-import * as Linking from "expo-linking";
-import * as WebBrowser from "expo-web-browser";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { apiFetch, setAuthToken } from "@/src/api/client";
+import { getGoogleIdToken, googleSignOut, nativeGoogleAvailable } from "@/src/auth/google";
+import * as purchases from "@/src/billing/purchases";
 import { storage } from "@/src/utils/storage";
-
-WebBrowser.maybeCompleteAuthSession();
 
 const TOKEN_KEY = "immortality_session_token";
 
@@ -22,99 +19,71 @@ export type User = {
   reminder_hour?: number;
   reminder_minute?: number;
   created_at?: string;
+  auth_provider?: string;
+  has_password?: boolean;
+  is_premium?: boolean;
+  premium_expires_at?: string | null;
 };
+
+type Providers = { google: boolean; password_reset: boolean };
+type SessionResponse = { session_token: string; user: User };
 
 type AuthState = {
   user: User | null;
   loading: boolean;
+  /** Inner Chamber membership: the server's verdict or RevenueCat's on this device. */
+  isPremium: boolean;
+  providers: Providers;
   register: (email: string, password: string, display_name: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
+  changePassword: (currentPassword: string | null, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
+  logoutEverywhere: () => Promise<void>;
   setUser: (u: User) => void;
   refresh: () => Promise<void>;
+  refreshPremium: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-function extractSessionId(url: string | null): string | null {
-  if (!url) return null;
-  const m = url.match(/[?#&]session_id=([^&#]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const processedSessionIds = useRef<Set<string>>(new Set());
-  const capturedUrl = useRef<string | null>(null);
+  const [deviceEntitled, setDeviceEntitled] = useState(false);
+  const [providers, setProviders] = useState<Providers>({ google: false, password_reset: false });
 
-  const persistToken = useCallback(async (token: string) => {
-    setAuthToken(token);
-    await storage.secureSet(TOKEN_KEY, token);
-  }, []);
-
-  const clearToken = useCallback(async () => {
+  const clearLocal = useCallback(async () => {
     setAuthToken(null);
     await storage.secureRemove(TOKEN_KEY);
     setUserState(null);
+    setDeviceEntitled(false);
+    await purchases.forget();
+    await googleSignOut();
   }, []);
 
-  const exchangeSessionId = useCallback(
-    async (sessionId: string) => {
-      if (processedSessionIds.current.has(sessionId)) return;
-      processedSessionIds.current.add(sessionId);
-      const res = await apiFetch<{ session_token: string; user: User }>("/auth/session", {
-        method: "POST",
-        body: { session_id: sessionId },
-      });
-      await persistToken(res.session_token);
-      setUserState(res.user);
-    },
-    [persistToken]
-  );
+  const startSession = useCallback(async (res: SessionResponse) => {
+    setAuthToken(res.session_token);
+    await storage.secureSet(TOKEN_KEY, res.session_token);
+    setUserState(res.user);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
       const res = await apiFetch<{ user: User }>("/auth/me");
       setUserState(res.user);
-    } catch {
-      await clearToken();
+    } catch (e: any) {
+      // Only a rejected session signs you out; a flaky network should not.
+      if (e?.status === 401) await clearLocal();
     }
-  }, [clearToken]);
+  }, [clearLocal]);
 
-  // Bootstrap: process any inbound session_id first, else restore token.
+  // Bootstrap: restore the saved session.
   useEffect(() => {
-    let sub: ReturnType<typeof Linking.addEventListener> | undefined;
     (async () => {
       try {
-        if (Platform.OS === "web") {
-          const href = typeof window !== "undefined" ? window.location.href : null;
-          const sid = extractSessionId(href);
-          if (sid) {
-            await exchangeSessionId(sid);
-            if (typeof window !== "undefined") {
-              const clean = window.location.origin + window.location.pathname;
-              window.history.replaceState(window.history.state, "", clean);
-            }
-            setLoading(false);
-            return;
-          }
-        } else {
-          sub = Linking.addEventListener("url", ({ url }) => {
-            capturedUrl.current = url;
-            const sid = extractSessionId(url);
-            if (sid) exchangeSessionId(sid).catch(() => {});
-          });
-          const initial = await Linking.getInitialURL();
-          const sid = extractSessionId(initial);
-          if (sid) {
-            await exchangeSessionId(sid);
-            setLoading(false);
-            return;
-          }
-        }
-
         const token = await storage.secureGet<string>(TOKEN_KEY, "");
         if (token) {
           setAuthToken(token);
@@ -126,79 +95,133 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     })();
-    return () => {
-      if (sub) sub.remove();
-    };
-  }, [exchangeSessionId, refresh]);
+    apiFetch<Providers>("/auth/providers")
+      .then(setProviders)
+      .catch(() => {});
+  }, [refresh]);
+
+  // Tie RevenueCat to the signed-in account and follow entitlement changes.
+  const userId = user?.user_id;
+  useEffect(() => {
+    if (!userId) return;
+    let unsubscribe = () => {};
+    (async () => {
+      await purchases.identify(userId);
+      setDeviceEntitled(await purchases.hasActiveEntitlement());
+      unsubscribe = purchases.onEntitlementChange(setDeviceEntitled);
+    })();
+    return () => unsubscribe();
+  }, [userId]);
 
   const register = useCallback(
     async (email: string, password: string, display_name: string) => {
-      const res = await apiFetch<{ session_token: string; user: User }>("/auth/register", {
-        method: "POST",
-        body: { email, password, display_name },
-      });
-      await persistToken(res.session_token);
-      setUserState(res.user);
+      await startSession(
+        await apiFetch<SessionResponse>("/auth/register", { method: "POST", body: { email, password, display_name } })
+      );
     },
-    [persistToken]
+    [startSession]
   );
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const res = await apiFetch<{ session_token: string; user: User }>("/auth/login", {
-        method: "POST",
-        body: { email, password },
-      });
-      await persistToken(res.session_token);
-      setUserState(res.user);
+      await startSession(await apiFetch<SessionResponse>("/auth/login", { method: "POST", body: { email, password } }));
     },
-    [persistToken]
+    [startSession]
   );
 
   const signInWithGoogle = useCallback(async () => {
-    const redirectUrl =
-      Platform.OS === "web"
-        ? window.location.origin + "/"
-        : Linking.createURL("");
-    const authUrl = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    const idToken = await getGoogleIdToken();
+    if (!idToken) return;
+    await startSession(await apiFetch<SessionResponse>("/auth/google", { method: "POST", body: { id_token: idToken } }));
+  }, [startSession]);
 
-    if (Platform.OS === "web") {
-      window.location.href = authUrl;
-      return;
-    }
+  const requestPasswordReset = useCallback(async (email: string) => {
+    await apiFetch("/auth/password/forgot", { method: "POST", body: { email } });
+  }, []);
 
-    capturedUrl.current = null;
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-    let url: string | null = null;
-    if (result.type === "success" && (result as any).url) {
-      url = (result as any).url;
-    }
-    if (!url) url = capturedUrl.current;
-    if (!url) url = await Linking.getInitialURL();
-    const sid = extractSessionId(url);
-    if (sid) {
-      await exchangeSessionId(sid);
-    }
-  }, [exchangeSessionId]);
+  const resetPassword = useCallback(
+    async (email: string, code: string, newPassword: string) => {
+      await startSession(
+        await apiFetch<SessionResponse>("/auth/password/reset", {
+          method: "POST",
+          body: { email, code, new_password: newPassword },
+        })
+      );
+    },
+    [startSession]
+  );
+
+  const changePassword = useCallback(async (currentPassword: string | null, newPassword: string) => {
+    const res = await apiFetch<{ user: User }>("/auth/password", {
+      method: "POST",
+      body: { current_password: currentPassword, new_password: newPassword },
+    });
+    setUserState(res.user);
+  }, []);
 
   const logout = useCallback(async () => {
     try {
       await apiFetch("/auth/logout", { method: "POST" });
     } catch {
-      // ignore
+      // The local session is cleared regardless.
     }
-    await clearToken();
-  }, [clearToken]);
+    await clearLocal();
+  }, [clearLocal]);
+
+  const logoutEverywhere = useCallback(async () => {
+    await apiFetch("/auth/logout-all", { method: "POST" });
+    await clearLocal();
+  }, [clearLocal]);
+
+  const refreshPremium = useCallback(async () => {
+    setDeviceEntitled(await purchases.hasActiveEntitlement());
+    try {
+      setUserState(await purchases.syncWithServer<User>());
+    } catch {
+      // Server sync is best effort; the device entitlement already applies.
+    }
+  }, []);
 
   const setUser = useCallback((u: User) => setUserState(u), []);
 
-  return (
-    <AuthContext.Provider
-      value={{ user, loading, register, login, signInWithGoogle, logout, setUser, refresh }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthState>(
+    () => ({
+      user,
+      loading,
+      isPremium: !!user?.is_premium || deviceEntitled,
+      providers: { ...providers, google: providers.google && nativeGoogleAvailable() },
+      register,
+      login,
+      signInWithGoogle,
+      requestPasswordReset,
+      resetPassword,
+      changePassword,
+      logout,
+      logoutEverywhere,
+      setUser,
+      refresh,
+      refreshPremium,
+    }),
+    [
+      user,
+      loading,
+      deviceEntitled,
+      providers,
+      register,
+      login,
+      signInWithGoogle,
+      requestPasswordReset,
+      resetPassword,
+      changePassword,
+      logout,
+      logoutEverywhere,
+      setUser,
+      refresh,
+      refreshPremium,
+    ]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthState {

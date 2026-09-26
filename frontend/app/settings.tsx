@@ -3,11 +3,12 @@ import { Alert, Linking, Platform, Pressable, StyleSheet, TextInput, View } from
 import { useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X, SignOut, Bell, Trash } from "phosphor-react-native";
+import { X, SignOut, Bell, Trash, Crown, Key } from "phosphor-react-native";
 
 import { Button, Chip, Divider, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
+import * as purchases from "@/src/billing/purchases";
 import { cancelDailyReminder, requestReminderPermission, scheduleDailyReminder } from "@/src/utils/reminders";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -25,7 +26,12 @@ export default function Settings() {
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState("");
   const [deleting, setDeleting] = useState(false);
-  const { user, setUser, logout } = useAuth();
+  const { user, setUser, logout, logoutEverywhere, changePassword, isPremium, refreshPremium } = useAuth();
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pwBusy, setPwBusy] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [name, setName] = useState(user?.display_name || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [saved, setSaved] = useState(false);
@@ -78,6 +84,46 @@ export default function Settings() {
       setSaved(true);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const submitPassword = async () => {
+    setPwMsg(null);
+    if (newPw.length < 8) {
+      setPwMsg({ ok: false, text: "Use at least 8 characters." });
+      return;
+    }
+    setPwBusy(true);
+    try {
+      await changePassword(user?.has_password ? currentPw : null, newPw);
+      setCurrentPw("");
+      setNewPw("");
+      setPwMsg({ ok: true, text: "Password updated. Other devices have been signed out." });
+    } catch (e: any) {
+      setPwMsg({ ok: false, text: e?.message ?? "Could not update your password." });
+    } finally {
+      setPwBusy(false);
+    }
+  };
+
+  const restorePurchases = async () => {
+    setRestoring(true);
+    try {
+      const found = await purchases.restore();
+      await refreshPremium();
+      Alert.alert(found ? "Restored" : "Nothing to restore", found ? "Your Inner Chamber membership is active." : "No active membership was found for this store account.");
+    } catch (e: any) {
+      Alert.alert("Restore failed", e?.message ?? "Please try again.");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const signOutEverywhere = async () => {
+    try {
+      await logoutEverywhere();
+    } catch (e: any) {
+      Alert.alert("Could not sign out", e?.message ?? "Please try again.");
     }
   };
 
@@ -163,9 +209,78 @@ export default function Settings() {
 
         <Divider style={{ marginVertical: spacing.xxl }} />
 
+        {/* Membership */}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Crown size={18} color={colors.brandPrimary} weight="regular" />
+          <Txt variant="label" style={{ marginLeft: spacing.sm }}>Inner Chamber membership</Txt>
+        </View>
+        <Txt variant="bodySm" style={{ marginTop: spacing.xs }} testID="settings-membership-status">
+          {isPremium
+            ? user?.premium_expires_at
+              ? `Active. Renews or ends on ${new Date(user.premium_expires_at).toLocaleDateString()}.`
+              : "Active."
+            : "Not a member. The Year 2 path and unlimited lineages are part of the membership."}
+        </Txt>
+        <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, flexWrap: "wrap" }}>
+          <Button
+            label={isPremium ? "Manage" : "See membership"}
+            small
+            onPress={() => (isPremium ? purchases.openCustomerCenter().catch(() => {}) : router.push("/paywall"))}
+            testID="settings-membership-button"
+          />
+          {purchases.purchasesAvailable() ? (
+            <Button label="Restore purchases" variant="ghost" small loading={restoring} onPress={restorePurchases} testID="settings-restore-button" />
+          ) : null}
+        </View>
+
+        <Divider style={{ marginVertical: spacing.xxl }} />
+
+        {/* Password */}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Key size={18} color={colors.brandPrimary} weight="regular" />
+          <Txt variant="label" style={{ marginLeft: spacing.sm }}>{user?.has_password ? "Change password" : "Add a password"}</Txt>
+        </View>
+        {!user?.has_password ? (
+          <Txt variant="bodySm" style={{ marginTop: spacing.xs }}>
+            You sign in with Google. Adding a password lets you sign in with your email too.
+          </Txt>
+        ) : (
+          <TextInput
+            value={currentPw}
+            onChangeText={setCurrentPw}
+            placeholder="Current password"
+            placeholderTextColor={colors.muted}
+            secureTextEntry
+            autoCapitalize="none"
+            style={[styles.input, { marginTop: spacing.md }]}
+            testID="settings-current-password"
+          />
+        )}
+        <TextInput
+          value={newPw}
+          onChangeText={setNewPw}
+          placeholder="New password (8+ characters)"
+          placeholderTextColor={colors.muted}
+          secureTextEntry
+          autoCapitalize="none"
+          style={[styles.input, { marginTop: spacing.md }]}
+          testID="settings-new-password"
+        />
+        {pwMsg ? (
+          <Txt variant="bodySm" color={pwMsg.ok ? colors.success : colors.error} style={{ marginTop: spacing.sm }}>
+            {pwMsg.text}
+          </Txt>
+        ) : null}
+        <Button label="Save password" variant="secondary" small loading={pwBusy} onPress={submitPassword} style={{ marginTop: spacing.md }} testID="settings-save-password" />
+
+        <Divider style={{ marginVertical: spacing.xxl }} />
+
         <Pressable onPress={logout} style={styles.logout} testID="settings-logout-button">
           <SignOut size={20} color={colors.error} weight="regular" />
           <Txt variant="label" color={colors.error} style={{ marginLeft: spacing.sm }}>Sign out</Txt>
+        </Pressable>
+        <Pressable onPress={signOutEverywhere} style={styles.logout} testID="settings-logout-all-button">
+          <Txt variant="bodySm" color={colors.error}>Sign out on all devices</Txt>
         </Pressable>
 
         <Divider style={{ marginVertical: spacing.xxl }} />
@@ -202,7 +317,7 @@ export default function Settings() {
         </Pressable>
 
         <Txt variant="caption" center style={{ marginTop: spacing.xxl, lineHeight: 16 }}>
-          Essence Path is a space for historical exploration and personal practice — not medical advice.
+          Immortal is a space for historical exploration and personal practice — not medical advice.
         </Txt>
       </KeyboardAwareScrollView>
     </View>
