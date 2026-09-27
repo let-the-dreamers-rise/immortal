@@ -159,6 +159,19 @@ def public_user(u: dict) -> dict:
     }
 
 
+def community_user(u: dict) -> dict:
+    # What other practitioners see. The intention, reminders, sign-in method
+    # and membership stay private, as the privacy policy promises.
+    return {
+        "user_id": u["user_id"],
+        "display_name": u.get("display_name"),
+        "picture": u.get("picture"),
+        "path_choice": u.get("path_choice"),
+        "bio": u.get("bio"),
+        "practice_name": cultivation.public_name(u),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Auth models
 # ---------------------------------------------------------------------------
@@ -1057,7 +1070,7 @@ async def practitioners(user: dict = Depends(get_current_user)):
         )
         out.append(
             {
-                **public_user(u),
+                **community_user(u),
                 "growth": stats["growth"],
                 "last_practised": (last or {}).get("date"),
                 "is_following": u["user_id"] in following,
@@ -1085,7 +1098,7 @@ async def user_profile(user_id: str, user: dict = Depends(get_current_user)):
     )
     logs = await enrich_logs(logs)
     return {
-        "profile": {**public_user(u), **stats, "followers": followers, "following": following, "is_following": is_following},
+        "profile": {**community_user(u), **stats, "followers": followers, "following": following, "is_following": is_following},
         "logs": logs,
     }
 

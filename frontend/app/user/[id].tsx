@@ -6,6 +6,7 @@ import { CaretLeft } from "phosphor-react-native";
 
 import { Avatar, Button, EmptyState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
 import { nth } from "@/src/passes/share";
 import type { PracticeName } from "@/src/passes/types";
 import { colors, fonts, radius, spacing } from "@/src/theme";
@@ -15,7 +16,6 @@ type Profile = {
   display_name: string;
   picture?: string | null;
   bio?: string | null;
-  intention?: string | null;
   growth: { glyph: string; label: string; days: number };
   total_days: number;
   followers: number;
@@ -29,6 +29,7 @@ export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
 
@@ -38,7 +39,12 @@ export default function UserProfile() {
     setLogs(res.logs);
   }, [id]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Wait for the session token to be restored: a shared link lands here cold.
+  useFocusEffect(
+    useCallback(() => {
+      if (!authLoading) load().catch(() => {});
+    }, [authLoading, load])
+  );
 
   const toggle = async () => {
     if (!profile) return;
@@ -81,11 +87,6 @@ export default function UserProfile() {
             </Txt>
           ) : null}
           {profile.bio ? <Txt variant="bodySm" center style={{ marginTop: spacing.xs }}>{profile.bio}</Txt> : null}
-          {profile.intention ? (
-            <Txt variant="bodySm" center style={{ marginTop: spacing.sm, fontStyle: "italic" }} color={colors.onSurfaceSecondary}>
-              “{profile.intention}”
-            </Txt>
-          ) : null}
         </View>
 
         <View style={styles.stats}>

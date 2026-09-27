@@ -25,7 +25,6 @@ type Practitioner = {
   user_id: string;
   display_name: string;
   picture?: string | null;
-  intention?: string | null;
   growth: { glyph: string; label: string; days: number };
   last_practised: string | null;
   is_following: boolean;
