@@ -25,7 +25,6 @@ type Practitioner = {
   user_id: string;
   display_name: string;
   picture?: string | null;
-  intention?: string | null;
   growth: { glyph: string; label: string; days: number };
   last_practised: string | null;
   is_following: boolean;
@@ -154,11 +153,12 @@ export default function CommunityScreen() {
                 <Avatar name={user?.display_name} uri={user?.picture} size={56} />
                 <View style={{ flex: 1 }}>
                   <Txt variant="title" color={colors.onSurfaceInverse} style={{ fontSize: 22 }}>{user?.display_name}</Txt>
-                  <View style={styles.standingRow}>
+                  <Pressable style={styles.standingRow} onPress={() => router.push("/passes")} testID="community-passes-link">
                     <Txt variant="caption" color={colors.onSurfaceInverse} style={{ opacity: 0.9 }}>
+                      {user?.practice_name ? `${user.practice_name.name} · ` : ""}
                       {stats?.growth?.glyph} {stats?.growth?.label?.toUpperCase()}
                     </Txt>
-                  </View>
+                  </Pressable>
                 </View>
               </View>
               <View style={styles.statRow}>

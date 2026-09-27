@@ -7,6 +7,7 @@ import { GearSix } from "phosphor-react-native";
 import { Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
+import type { TodayPasses } from "@/src/passes/types";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 // The Today screen exists to answer "what do I do now" before the question is
@@ -47,6 +48,7 @@ type Today = {
   alternative: Practice | null;
   growth: Growth;
   closing_line: string | null;
+  passes?: TodayPasses;
 };
 
 function duration(p: Practice) {
@@ -83,6 +85,7 @@ export default function TodayScreen() {
   };
 
   const g = data?.growth;
+  const p = data?.passes;
 
   return (
     <View style={styles.container}>
@@ -127,6 +130,34 @@ export default function TodayScreen() {
                 ? "No days yet"
                 : `${g?.days} ${g?.days === 1 ? "day" : "days"} of practice`}
             </Txt>
+
+            {/* The passes, in one line: a scroll that opened today, the
+                next one, or the invitation to take a name. */}
+            {p?.opened_today ? (
+              <Pressable
+                testID="today-scroll-opened"
+                onPress={() => router.push(`/scroll/${p.opened_today!.key}?fresh=1`)}
+                style={styles.passLine}
+              >
+                <Txt variant="bodySm" center color={colors.cinnabar}>
+                  A scroll opened today: {p.opened_today.title}
+                </Txt>
+              </Pressable>
+            ) : p?.name ? (
+              <Pressable testID="today-passes" onPress={() => router.push("/passes")} style={styles.passLine}>
+                <Txt variant="bodySm" center color={colors.onSurfaceSecondary}>
+                  {p.name.name}
+                  {p.next ? ` · the next scroll opens in ${p.next.days_left} ${p.next.days_left === 1 ? "day" : "days"}` : ""}
+                </Txt>
+              </Pressable>
+            ) : p?.open_generation ? (
+              <Pressable testID="today-take-name" onPress={() => router.push("/vow")} style={styles.passLine}>
+                <Txt variant="bodySm" center color={colors.cinnabar}>
+                  Take your name · {p.open_generation.remaining} of {p.open_generation.size} places left in the{" "}
+                  {p.open_generation.label.toLowerCase()}
+                </Txt>
+              </Pressable>
+            ) : null}
           </View>
 
           <View style={styles.rule} />
@@ -244,6 +275,7 @@ const styles = StyleSheet.create({
     color: colors.onSurface,
   },
   growthLine: { marginTop: spacing.xs, maxWidth: 300, lineHeight: 20 },
+  passLine: { marginTop: spacing.md, paddingVertical: spacing.xs, maxWidth: 320 },
   arcTrack: {
     flexDirection: "row",
     height: 2,

@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { apiFetch, setAuthToken } from "@/src/api/client";
 import { getGoogleIdToken, googleSignOut, nativeGoogleAvailable } from "@/src/auth/google";
 import * as purchases from "@/src/billing/purchases";
+import type { PracticeName } from "@/src/passes/types";
 import { storage } from "@/src/utils/storage";
 
 const TOKEN_KEY = "immortality_session_token";
@@ -23,6 +24,7 @@ export type User = {
   has_password?: boolean;
   is_premium?: boolean;
   premium_expires_at?: string | null;
+  practice_name?: PracticeName | null;
 };
 
 type Providers = { google: boolean; password_reset: boolean };

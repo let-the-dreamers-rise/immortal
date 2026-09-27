@@ -28,6 +28,8 @@ from starlette.middleware.cors import CORSMiddleware
 
 import auth_extra
 import billing
+import cultivation
+import growth
 import lineages
 from seed_lineages import ARCHIVE_USER, FOUNDING_LINEAGES
 from today import build_today, growth_for
@@ -153,6 +155,20 @@ def public_user(u: dict) -> dict:
         "has_password": bool(u.get("hashed_password")),
         "is_premium": billing.user_is_premium(u),
         "premium_expires_at": u.get("premium_expires_at"),
+        "practice_name": cultivation.public_name(u),
+    }
+
+
+def community_user(u: dict) -> dict:
+    # What other practitioners see. The intention, reminders, sign-in method
+    # and membership stay private, as the privacy policy promises.
+    return {
+        "user_id": u["user_id"],
+        "display_name": u.get("display_name"),
+        "picture": u.get("picture"),
+        "path_choice": u.get("path_choice"),
+        "bio": u.get("bio"),
+        "practice_name": cultivation.public_name(u),
     }
 
 
@@ -508,8 +524,7 @@ async def today(user: dict = Depends(get_current_user)):
     now = now_utc()
     uid = user["user_id"]
 
-    logs = await db.logs.find({"user_id": uid, "deleted_at": None}, {"_id": 0, "date": 1}).to_list(2000)
-    dates = {l["date"] for l in logs}
+    dates = set(await cultivation.practice_dates(db, uid))
     total_days = len(dates)
     logged_today = now.strftime("%Y-%m-%d") in dates
 
@@ -537,6 +552,7 @@ async def today(user: dict = Depends(get_current_user)):
         stage_title=(stage or {}).get("title"),
     )
     payload["stage_order"] = (stage or {}).get("order")
+    payload["passes"] = await cultivation.today_summary(db, user, total_days, logged_today)
     return payload
 
 
@@ -677,6 +693,8 @@ async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
     if body.visibility not in ("private", "public"):
         raise HTTPException(status_code=400, detail="Invalid visibility")
     now = now_utc()
+    date = now.strftime("%Y-%m-%d")
+    new_day = not await db.logs.find_one({"user_id": user["user_id"], "date": date, "deleted_at": None}, {"_id": 1})
     log = {
         "log_id": "log_" + uuid.uuid4().hex[:12],
         "user_id": user["user_id"],
@@ -687,13 +705,15 @@ async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
         "stage_order": body.stage_order,
         "visibility": body.visibility,
         "created_at": now,
-        "date": now.strftime("%Y-%m-%d"),
+        "date": date,
         "deleted_at": None,
     }
     await db.logs.insert_one(dict(log))
     await bump_stage_checkin(user["user_id"], body.stage_order)
     log.pop("deleted_at", None)
-    return {"log": log}
+    # The first log of a new practice day can open a scroll; the app unrolls it.
+    opened = await cultivation.opened_by_new_day(db, user["user_id"]) if new_day else None
+    return {"log": log, "opened_scroll": opened}
 
 
 async def enrich_logs(docs: List[dict]) -> List[dict]:
@@ -1003,10 +1023,9 @@ def compute_streaks(dates: List[str]) -> dict:
 
 
 async def build_stats(user_id: str) -> dict:
-    logs = await db.logs.find({"user_id": user_id, "deleted_at": None}, {"_id": 0, "date": 1}).to_list(2000)
-    dates = [l["date"] for l in logs]
+    dates = await cultivation.practice_dates(db, user_id)
     streaks = compute_streaks(dates)
-    total_logs = len(logs)
+    total_logs = await db.logs.count_documents({"user_id": user_id, "deleted_at": None})
     achieved = [m for m in MILESTONES if streaks["longest"] >= m or streaks["total_days"] >= m]
     is_elder = streaks["longest"] >= 90 or streaks["total_days"] >= 108
     return {
@@ -1051,7 +1070,7 @@ async def practitioners(user: dict = Depends(get_current_user)):
         )
         out.append(
             {
-                **public_user(u),
+                **community_user(u),
                 "growth": stats["growth"],
                 "last_practised": (last or {}).get("date"),
                 "is_following": u["user_id"] in following,
@@ -1079,7 +1098,7 @@ async def user_profile(user_id: str, user: dict = Depends(get_current_user)):
     )
     logs = await enrich_logs(logs)
     return {
-        "profile": {**public_user(u), **stats, "followers": followers, "following": following, "is_following": is_following},
+        "profile": {**community_user(u), **stats, "followers": followers, "following": following, "is_following": is_following},
         "logs": logs,
     }
 
@@ -1129,6 +1148,8 @@ api.include_router(
 )
 api.include_router(billing.build_router(db, get_current_user, public_user))
 api.include_router(lineages.build_router(db, get_current_user))
+api.include_router(growth.build_router(db))
+api.include_router(cultivation.build_router(db, get_current_user))
 app.include_router(api)
 
 # Origins come from CORS_ORIGINS (comma-separated) in deployed environments.

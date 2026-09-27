@@ -62,8 +62,12 @@ export default function JournalScreen() {
     setPosting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
-      await apiFetch("/logs", { method: "POST", body: { nothing_happened: true, visibility: "private" } });
+      const res = await apiFetch<{ opened_scroll: { key: string } | null }>("/logs", {
+        method: "POST",
+        body: { nothing_happened: true, visibility: "private" },
+      });
       await load();
+      if (res?.opened_scroll) router.push(`/scroll/${res.opened_scroll.key}?fresh=1`);
     } finally {
       setPosting(false);
     }

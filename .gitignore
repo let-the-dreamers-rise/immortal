@@ -80,3 +80,6 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
+
+# Sealed scroll texts are private: only their fingerprints are published.
+*sealed-scrolls*.json

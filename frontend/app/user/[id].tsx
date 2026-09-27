@@ -6,6 +6,9 @@ import { CaretLeft } from "phosphor-react-native";
 
 import { Avatar, Button, EmptyState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
+import { nth } from "@/src/passes/share";
+import type { PracticeName } from "@/src/passes/types";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Profile = {
@@ -13,12 +16,12 @@ type Profile = {
   display_name: string;
   picture?: string | null;
   bio?: string | null;
-  intention?: string | null;
   growth: { glyph: string; label: string; days: number };
   total_days: number;
   followers: number;
   following: number;
   is_following: boolean;
+  practice_name?: PracticeName | null;
 };
 type Log = { log_id: string; body: string; nothing_happened: boolean; created_at: string; practice_titles: string[] };
 
@@ -26,6 +29,7 @@ export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
 
@@ -35,7 +39,12 @@ export default function UserProfile() {
     setLogs(res.logs);
   }, [id]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  // Wait for the session token to be restored: a shared link lands here cold.
+  useFocusEffect(
+    useCallback(() => {
+      if (!authLoading) load().catch(() => {});
+    }, [authLoading, load])
+  );
 
   const toggle = async () => {
     if (!profile) return;
@@ -70,14 +79,14 @@ export default function UserProfile() {
           <Avatar name={profile.display_name} uri={profile.picture} size={84} />
           <View style={{ flexDirection: "row", alignItems: "center", marginTop: spacing.md, gap: spacing.sm }}>
             <Txt variant="title">{profile.display_name}</Txt>
-            
           </View>
-          {profile.bio ? <Txt variant="bodySm" center style={{ marginTop: spacing.xs }}>{profile.bio}</Txt> : null}
-          {profile.intention ? (
-            <Txt variant="bodySm" center style={{ marginTop: spacing.sm, fontStyle: "italic" }} color={colors.onSurfaceSecondary}>
-              “{profile.intention}”
+          {profile.practice_name ? (
+            <Txt variant="bodySm" center color={colors.cinnabar} style={{ marginTop: 2 }} testID="user-practice-name">
+              {profile.practice_name.name} · {profile.practice_name.romanized} · {nth(profile.practice_name.seat)} of the{" "}
+              {profile.practice_name.generation_label.toLowerCase()}
             </Txt>
           ) : null}
+          {profile.bio ? <Txt variant="bodySm" center style={{ marginTop: spacing.xs }}>{profile.bio}</Txt> : null}
         </View>
 
         <View style={styles.stats}>
