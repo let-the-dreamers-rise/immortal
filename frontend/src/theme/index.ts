@@ -1,4 +1,4 @@
-// Design tokens for Essence Path — Dao Longevity.
+// Design tokens for Immortal — Dao Longevity.
 // Calm ink-wash / journal aesthetic: muted earth tones, generous whitespace.
 
 export const colors = {

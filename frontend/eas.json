@@ -13,11 +13,17 @@
       "android": {
         "buildType": "apk"
       },
-      "environment": "preview"
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://immortal-api-222482716856.us-central1.run.app"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "environment": "production"
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://immortal-api-222482716856.us-central1.run.app"
+      }
     }
   },
   "submit": {
