@@ -17,6 +17,17 @@ def test_public_user_exposes_auth_shape(user):
     assert u["is_premium"] is False
 
 
+PRIVATE_FIELDS = {"intention", "reminder_enabled", "reminder_hour", "auth_provider", "has_password", "is_premium", "premium_expires_at"}
+
+
+def test_community_endpoints_hide_private_fields(client, user, other):
+    people = client.get("/api/community/practitioners", headers=other["headers"]).json()["practitioners"]
+    me = next(p for p in people if p["user_id"] == user["user"]["user_id"])
+    assert not PRIVATE_FIELDS & me.keys()
+    profile = client.get(f"/api/community/users/{user['user']['user_id']}", headers=other["headers"]).json()["profile"]
+    assert not PRIVATE_FIELDS & profile.keys()
+
+
 def test_change_password_requires_current(client, user):
     r = client.post("/api/auth/password", json={"current_password": "wrong-one", "new_password": "brandnew99"}, headers=user["headers"])
     assert r.status_code == 401
