@@ -28,6 +28,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 import auth_extra
 import billing
+import growth
 import lineages
 from seed_lineages import ARCHIVE_USER, FOUNDING_LINEAGES
 from today import build_today, growth_for
@@ -1129,6 +1130,7 @@ api.include_router(
 )
 api.include_router(billing.build_router(db, get_current_user, public_user))
 api.include_router(lineages.build_router(db, get_current_user))
+api.include_router(growth.build_router(db))
 app.include_router(api)
 
 # Origins come from CORS_ORIGINS (comma-separated) in deployed environments.
