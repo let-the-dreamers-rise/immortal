@@ -57,6 +57,9 @@ function RootNavigator() {
       <Stack.Screen name="paywall" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
       <Stack.Screen name="lineage/[id]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="lineage/new" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+      <Stack.Screen name="passes" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="scroll/[key]" options={{ animation: "fade" }} />
+      <Stack.Screen name="vow" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
     </Stack>
   );
 }

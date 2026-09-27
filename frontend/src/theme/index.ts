@@ -29,6 +29,9 @@ export const colors = {
   borderStrong: "#B8B1A4",
   divider: "#E6E2D8",
   muted: "#7A756B",
+  // The red of a seal on a scroll. Used only for the passes.
+  cinnabar: "#9C4A36",
+  onCinnabar: "#F7F5F0",
 };
 
 export const fonts = {

@@ -38,7 +38,7 @@ export default function NewLog() {
   const save = async () => {
     setBusy(true);
     try {
-      await apiFetch("/logs", {
+      const res = await apiFetch<{ opened_scroll: { key: string } | null }>("/logs", {
         method: "POST",
         body: {
           body,
@@ -49,7 +49,9 @@ export default function NewLog() {
           stage_order: stage ? Number(stage) : null,
         },
       });
-      router.back();
+      // A new practice day can open a scroll: show it in place of the journal.
+      if (res?.opened_scroll) router.replace(`/scroll/${res.opened_scroll.key}?fresh=1`);
+      else router.back();
     } finally {
       setBusy(false);
     }
