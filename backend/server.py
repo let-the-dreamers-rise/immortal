@@ -1268,7 +1268,9 @@ async def ensure_indexes():
 
 @app.on_event("startup")
 async def on_startup():
-    await ensure_indexes()
+    # In the background: on Firestore an index build can take minutes, far
+    # longer than a Cloud Run startup probe waits, and queries work without it.
+    asyncio.create_task(ensure_indexes())
     await seed_content()
     init_storage()
     asyncio.create_task(generate_illustrations())

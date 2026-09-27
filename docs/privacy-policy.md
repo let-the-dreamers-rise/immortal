@@ -1,10 +1,10 @@
-# Privacy Policy — Essence Path
+# Privacy Policy — Immortal
 
 **Last updated: 18 September 2026**
 
-This policy explains what Essence Path collects, why, who else can see it, and how to get it back or get rid of it. It describes what the app actually does, not what apps in general do.
+This policy explains what Immortal collects, why, who else can see it, and how to get it back or get rid of it. It describes what the app actually does, not what apps in general do.
 
-In this policy, "we" and "us" mean **[LEGAL ENTITY NAME]**, **[REGISTERED ADDRESS]**, the data fiduciary responsible for Essence Path. "You" means the person using the app.
+In this policy, "we" and "us" mean **[LEGAL ENTITY NAME]**, **[REGISTERED ADDRESS]**, the data fiduciary responsible for Immortal. "You" means the person using the app.
 
 Questions, requests, or complaints: **[PRIVACY CONTACT EMAIL]**.
 
@@ -62,7 +62,7 @@ You can decline. The app works without it; circles simply are not distance-sorte
 
 This one matters enough to have its own section.
 
-Essence Path is about physical and contemplative practice. What you write in your journal — how a practice felt, your mood, what your body did, why you stopped — **may reveal information about your physical or mental health.** Under India's Digital Personal Data Protection Act, 2023, and under Article 9 of the GDPR for users in the European Economic Area, that is sensitive information.
+Immortal is about physical and contemplative practice. What you write in your journal — how a practice felt, your mood, what your body did, why you stopped — **may reveal information about your physical or mental health.** Under India's Digital Personal Data Protection Act, 2023, and under Article 9 of the GDPR for users in the European Economic Area, that is sensitive information.
 
 So:
 
@@ -71,7 +71,7 @@ So:
 - We do not share journal content with anyone except as described in section 5.
 - **Once you make an entry public, other people can read it, screenshot it, and remember it.** Deleting it later removes it from the app; it cannot un-see it. Think before you publish.
 
-Essence Path is not a medical service and we are not your healthcare provider. Nothing you write here is a medical record and nothing we show you is medical advice.
+Immortal is not a medical service and we are not your healthcare provider. Nothing you write here is a medical record and nothing we show you is medical advice.
 
 ---
 
@@ -101,8 +101,9 @@ We use a small number of providers to run the app. They process data on our inst
 
 | Provider | What they handle |
 |---|---|
-| **MongoDB** | Hosts the database holding your account, entries, and everything else in section 2 |
-| **Emergent** (`emergentagent.com`) | Application hosting; exchanges the sign-in token when you use Google sign-in; stores the illustration images shown in the practice library |
+| **Google Cloud** | Hosts the app's server and the database holding your account, entries, and everything else in section 2 |
+| **RevenueCat** | Only if you buy or restore the Inner Chamber membership. Receives your account ID and your app store purchase records, to confirm whether your membership is active. It never receives your journal or notes |
+| **Google Play / Apple App Store** | Process membership payments. We never see your card or payment details |
 | **Google** | Only if you choose Google sign-in. Google supplies your email, name, and photo URL. Google's own privacy policy governs what Google does |
 | **Expo** | Schedules the daily reminder notification on your device. Reminders are local to your device |
 
@@ -145,7 +146,7 @@ Whatever country you are in, you can ask us to:
 
 **For anything else — access, correction, export, or withdrawing consent — email [PRIVACY CONTACT EMAIL].** We will respond within 30 days.
 
-Deleting your account erases your profile, every journal entry, your comments, your RSVPs, who you follow and who follows you, and any practice circles you were hosting. Nothing is anonymised and kept; it is removed. Note that anything you published publicly may already have been seen or copied by others, and deletion here cannot reach that.
+Deleting your account erases your profile, every journal entry, your comments, your RSVPs, who you follow and who follows you, any practice circles you were hosting, and the lineages you recorded, the days you logged on lineages and the field notes you left. Deleting your account does not cancel a store subscription; cancel it in your Google Play or App Store settings. Nothing is anonymised and kept; it is removed. Note that anything you published publicly may already have been seen or copied by others, and deletion here cannot reach that.
 
 **If you are in India**, the Digital Personal Data Protection Act, 2023 gives you these rights, plus the right to nominate someone to exercise them on your behalf if you die or become incapacitated. You may complain to us first at the address above; if unsatisfied, you may approach the Data Protection Board of India.
 
@@ -169,7 +170,7 @@ No system is perfectly secure. If we discover a breach affecting your personal d
 
 ## 10. Children
 
-Essence Path is for adults. **You must be 18 or older to create an account.**
+Immortal is for adults. **You must be 18 or older to create an account.**
 
 Some practices in the app involve physical exertion and breath retention, and the community includes real-world meetings — neither is appropriate for children. We do not knowingly collect data from anyone under 18. If we learn that we have, we will delete the account and its data. If you believe a child has created an account, write to **[PRIVACY CONTACT EMAIL]**.
 
@@ -177,7 +178,7 @@ Some practices in the app involve physical exertion and breath retention, and th
 
 ## 11. Changes
 
-If we change this policy in a way that materially affects your rights, we will tell you in the app before the change takes effect, and update the date at the top. Continuing to use Essence Path after that means you accept the revised policy.
+If we change this policy in a way that materially affects your rights, we will tell you in the app before the change takes effect, and update the date at the top. Continuing to use Immortal after that means you accept the revised policy.
 
 ---
 

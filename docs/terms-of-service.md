@@ -1,8 +1,8 @@
-# Terms of Service — Essence Path
+# Terms of Service — Immortal
 
 **Last updated: 18 September 2026**
 
-These terms are the agreement between you and **[LEGAL ENTITY NAME]**, **[REGISTERED ADDRESS]** ("we", "us") covering your use of the Essence Path app.
+These terms are the agreement between you and **[LEGAL ENTITY NAME]**, **[REGISTERED ADDRESS]** ("we", "us") covering your use of the Immortal app.
 
 By creating an account you accept them. If you do not accept them, do not use the app.
 
@@ -12,7 +12,7 @@ Contact: **[SUPPORT CONTACT EMAIL]**
 
 ## 1. Read this part properly
 
-**Essence Path is not medical advice, medical treatment, or a healthcare service. It does not diagnose, treat, cure, mitigate, or prevent any disease or condition.**
+**Immortal is not medical advice, medical treatment, or a healthcare service. It does not diagnose, treat, cure, mitigate, or prevent any disease or condition.**
 
 The app presents traditional Daoist and Ayurvedic practices as **historical material and personal exploration**. Where it describes what those traditions claimed, it is reporting what a tradition claimed — not telling you it is true, and not telling you it will happen to you. Where it cites modern research, it is summarising published work, not making a promise about your body.
 
@@ -51,7 +51,7 @@ If you have a personal or family history of psychosis, bipolar disorder, dissoci
 
 ---
 
-## 4. Who may use Essence Path
+## 4. Who may use Immortal
 
 You must be **18 or older**. You must be legally able to enter this agreement. You must not be barred from using the service under applicable law.
 
@@ -113,9 +113,9 @@ You may use the app for your own personal, non-commercial practice. You may not 
 
 ## 8. What we promise, and what we do not
 
-We will make reasonable efforts to keep Essence Path running and to fix problems when we hear about them.
+We will make reasonable efforts to keep Immortal running and to fix problems when we hear about them.
 
-Beyond that, and **to the fullest extent permitted by law, Essence Path is provided "as is" and "as available", without warranties of any kind.** We do not promise it will be uninterrupted, error-free, or that it will suit any particular purpose. We do not promise any outcome, benefit, or result from any practice in it.
+Beyond that, and **to the fullest extent permitted by law, Immortal is provided "as is" and "as available", without warranties of any kind.** We do not promise it will be uninterrupted, error-free, or that it will suit any particular purpose. We do not promise any outcome, benefit, or result from any practice in it.
 
 The app may be unavailable, may lose data, or may be discontinued. Keep your own copy of anything you cannot bear to lose — you can request an export at any time.
 
@@ -132,7 +132,11 @@ Subject to that, to the fullest extent permitted by law:
 - We are not liable for the conduct of other users, online or in person.
 - **Our total aggregate liability to you for all claims is limited to the greater of (a) the amount you paid us in the 12 months before the claim, or (b) INR 5,000.**
 
-Essence Path is currently free to use. If you paid us nothing, (b) is the cap.
+The core of Immortal is free to use. If you paid us nothing, (b) is the cap.
+
+### Inner Chamber membership
+
+The optional Inner Chamber membership unlocks the Year 2 path and recording more than one lineage. It is sold through Google Play or the App Store, which take payment, and it **renews automatically** at the price shown at purchase until you cancel it in your store account settings, at least 24 hours before the renewal date. Refunds are handled by the store under its own policy. The membership adds content and features; like everything else here, it promises no health outcome.
 
 ---
 
@@ -144,7 +148,7 @@ You agree to indemnify us against claims, losses, and reasonable legal costs ari
 
 ## 11. Suspension and termination
 
-**You** may stop using Essence Path at any time and delete your account from within the app, under Settings → Delete account. It takes effect immediately and cannot be undone.
+**You** may stop using Immortal at any time and delete your account from within the app, under Settings → Delete account. It takes effect immediately and cannot be undone.
 
 **We** may suspend or terminate your account if you break these terms, if we are legally required to, or if keeping it open would put other users at risk. Except where that is impractical or unsafe, we will tell you why and give you a chance to respond. You can ask us to review a termination by writing to the same address.
 
@@ -170,7 +174,7 @@ We may update these terms. If a change materially affects your rights, we will n
 
 ## 14. The rest
 
-- **Entire agreement.** These terms and the Privacy Policy are the whole agreement between us about Essence Path.
+- **Entire agreement.** These terms and the Privacy Policy are the whole agreement between us about Immortal.
 - **Severability.** If a court finds any part unenforceable, the rest stays in force.
 - **No waiver.** If we do not enforce something immediately, we have not given up the right to enforce it later.
 - **Assignment.** You may not transfer your rights under these terms. We may transfer ours to a successor if the business is sold, on notice to you.
