@@ -24,7 +24,21 @@ type Opts = {
   method?: string;
   body?: any;
   headers?: Record<string, string>;
+  /** Send without waiting for the saved session to be restored (bootstrap only). */
+  beforeAuthReady?: boolean;
 };
+
+// Screens opened straight from a link (or a page reload on the web) mount
+// before the saved session is read from storage. Their first request would
+// go out without a token and fail with "Not authenticated". Every request
+// waits for the restore to finish instead.
+let markAuthReady: () => void = () => {};
+const authReady = new Promise<void>((resolve) => {
+  markAuthReady = resolve;
+});
+export function setAuthReady() {
+  markAuthReady();
+}
 
 // The practitioner's own day: the server dates practice by this zone rather
 // than UTC, so a 6am session in India counts for that morning.
@@ -43,7 +57,8 @@ const TIMEOUT_MS = 20000;
 export const OFFLINE_MESSAGE = "Could not reach Immortal. Check your connection and try again.";
 
 export async function apiFetch<T = any>(path: string, opts: Opts = {}): Promise<T> {
-  const { method = "GET", body, headers = {} } = opts;
+  const { method = "GET", body, headers = {}, beforeAuthReady = false } = opts;
+  if (!beforeAuthReady) await authReady;
   // A request on a weak mobile signal can hang without ever failing; give up
   // after a while so the screen can offer a retry instead of spinning.
   const controller = new AbortController();

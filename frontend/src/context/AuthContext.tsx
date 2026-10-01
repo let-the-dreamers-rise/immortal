@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { apiFetch, setAuthToken } from "@/src/api/client";
+import { apiFetch, setAuthReady, setAuthToken } from "@/src/api/client";
 import { getGoogleIdToken, googleSignOut, nativeGoogleAvailable } from "@/src/auth/google";
 import * as purchases from "@/src/billing/purchases";
 import { storage } from "@/src/utils/storage";
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await apiFetch<{ user: User }>("/auth/me");
+      const res = await apiFetch<{ user: User }>("/auth/me", { beforeAuthReady: true });
       setUserState(res.user);
       await storage.setItem(USER_CACHE_KEY, JSON.stringify(res.user));
     } catch (e: any) {
@@ -111,10 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         // stay logged out
       } finally {
+        setAuthReady();
         setLoading(false);
       }
     })();
-    apiFetch<Providers>("/auth/providers")
+    apiFetch<Providers>("/auth/providers", { beforeAuthReady: true })
       .then(setProviders)
       .catch(() => {});
   }, [refresh]);
