@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { CaretLeft, Pause, Play, SkipForward } from "phosphor-react-native";
+import { CaretLeft, Pause, Play, SkipForward } from "@/src/components/icons";
 
 import { Button, Chip, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
@@ -179,7 +179,7 @@ export default function Session() {
 
   const top = (
     <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
-      <Pressable onPress={() => goBack(router)} hitSlop={12} testID="session-close">
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={12} testID="session-close">
         <CaretLeft size={22} color={colors.onSurface} weight="bold" />
       </Pressable>
       <Txt variant="label" numberOfLines={1} style={{ flex: 1, textAlign: "center", marginHorizontal: spacing.md }}>

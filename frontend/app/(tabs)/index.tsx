@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Check, Lock, GearSix } from "phosphor-react-native";
+import { Check, Lock, GearSix } from "@/src/components/icons";
 
 import { Badge, Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
@@ -63,7 +63,7 @@ export default function PathScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Txt variant="title" style={{ fontSize: 22 }}>The Dao Path</Txt>
-        <Pressable testID="path-settings-button" onPress={() => router.push("/settings")} hitSlop={12}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" testID="path-settings-button" onPress={() => router.push("/settings")} hitSlop={12}>
           <GearSix size={24} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
       </View>

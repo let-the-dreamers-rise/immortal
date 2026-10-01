@@ -4,7 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft, CaretRight, Info } from "phosphor-react-native";
+import { CaretLeft, CaretRight, Info } from "@/src/components/icons";
 
 import { Badge, Button, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage, mediaUri } from "@/src/api/client";
@@ -85,7 +85,7 @@ export default function StageDetail() {
   if (!stage) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable style={{ padding: spacing.lg }} onPress={() => goBack(router)} hitSlop={10}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" style={{ padding: spacing.lg }} onPress={() => goBack(router)} hitSlop={10}>
           <CaretLeft size={22} color={colors.onSurface} weight="bold" />
         </Pressable>
         {error ? <ErrorState message={error} onRetry={load} /> : <Loading />}
@@ -99,7 +99,7 @@ export default function StageDetail() {
         <View style={styles.hero}>
           <Image source={{ uri: IMAGES.pathHero }} style={StyleSheet.absoluteFill} contentFit="cover" />
           <LinearGradient colors={["rgba(26,25,24,0.35)", "rgba(26,25,24,0.8)"]} style={StyleSheet.absoluteFill} />
-          <Pressable style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => goBack(router)} testID="stage-back-button" hitSlop={10}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => goBack(router)} testID="stage-back-button" hitSlop={10}>
             <CaretLeft size={22} color={colors.onSurfaceInverse} weight="bold" />
           </Pressable>
           <View style={styles.heroContent}>

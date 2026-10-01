@@ -8,6 +8,7 @@
 import { Platform } from "react-native";
 
 import { apiFetch } from "@/src/api/client";
+import { requirePurchases, requirePurchasesUi } from "./sdk";
 
 export const ENTITLEMENT_ID = process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID || "pro";
 
@@ -33,7 +34,7 @@ let configured = false;
 function loadSdk(): any {
   if (sdk || Platform.OS === "web" || !API_KEY) return sdk;
   try {
-    sdk = require("react-native-purchases").default;
+    sdk = requirePurchases();
   } catch {
     sdk = null;
   }
@@ -43,7 +44,7 @@ function loadSdk(): any {
 function loadUi(): any {
   if (ui || Platform.OS === "web" || !API_KEY) return ui;
   try {
-    ui = require("react-native-purchases-ui").default;
+    ui = requirePurchasesUi();
   } catch {
     ui = null;
   }

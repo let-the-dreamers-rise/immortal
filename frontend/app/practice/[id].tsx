@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft, Warning, Clock, Barbell } from "phosphor-react-native";
+import { CaretLeft, Warning, Clock, Barbell } from "@/src/components/icons";
 
 import { Button, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage, mediaUri } from "@/src/api/client";
@@ -48,7 +48,7 @@ export default function PracticeDetail() {
   if (!p) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable style={{ padding: spacing.lg }} onPress={() => goBack(router)} hitSlop={10}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" style={{ padding: spacing.lg }} onPress={() => goBack(router)} hitSlop={10}>
           <CaretLeft size={22} color={colors.onSurface} weight="bold" />
         </Pressable>
         {error ? <ErrorState message={error} onRetry={load} /> : <Loading />}
@@ -56,7 +56,11 @@ export default function PracticeDetail() {
     );
   }
 
-  const minutes = p.seconds ? `${p.seconds} sec` : `${p.time_min || 5} min`;
+  // Some practices are ways of living (diet, sleep, seasons), not something
+  // you time. Those get "I did this today" instead of a meaningless timer.
+  const timed = !!p.seconds || p.time_min > 0;
+  const minutes = p.seconds ? `${p.seconds} sec` : `${p.time_min} min`;
+  const logToday = () => router.push(`/log/new?practice=${p.practice_id}`);
 
   const grad: [string, string] = p.tradition === "dao" ? ["#8C9A86", "#5E6C58"] : ["#C7A97C", "#8C7A6B"];
 
@@ -69,7 +73,7 @@ export default function PracticeDetail() {
             <Image source={{ uri: mediaUri(p.illustration_url) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={400} />
           ) : null}
           <LinearGradient colors={["rgba(26,25,24,0.15)", "rgba(26,25,24,0.55)"]} style={StyleSheet.absoluteFill} />
-          <Pressable style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => goBack(router)} testID="practice-back-button" hitSlop={10}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => goBack(router)} testID="practice-back-button" hitSlop={10}>
             <CaretLeft size={22} color={colors.onSurfaceInverse} weight="bold" />
           </Pressable>
           <View style={styles.heroContent}>
@@ -85,12 +89,16 @@ export default function PracticeDetail() {
             <Meta label={p.category} />
           </View>
 
-          <Button
-            label={`Begin · ${minutes}`}
-            onPress={() => router.push(`/session/${p.practice_id}`)}
-            style={{ marginTop: spacing.lg }}
-            testID="practice-begin-button"
-          />
+          {timed ? (
+            <Button
+              label={`Begin · ${minutes}`}
+              onPress={() => router.push(`/session/${p.practice_id}`)}
+              style={{ marginTop: spacing.lg }}
+              testID="practice-begin-button"
+            />
+          ) : (
+            <Button label="I lived this today" onPress={logToday} style={{ marginTop: spacing.lg }} testID="practice-begin-button" />
+          )}
 
           {p.safety_note ? (
             <View style={styles.safety}>
@@ -134,19 +142,25 @@ export default function PracticeDetail() {
             ))}
           </Section>
 
-          <Button
-            label={`Begin · ${minutes}`}
-            onPress={() => router.push(`/session/${p.practice_id}`)}
-            style={{ marginTop: spacing.xl }}
-            testID="practice-begin-bottom"
-          />
-          <Button
-            label="I did this without the timer"
-            variant="ghost"
-            onPress={() => router.push(`/log/new?practice=${p.practice_id}`)}
-            style={{ marginTop: spacing.md }}
-            testID="practice-log-button"
-          />
+          {timed ? (
+            <>
+              <Button
+                label={`Begin · ${minutes}`}
+                onPress={() => router.push(`/session/${p.practice_id}`)}
+                style={{ marginTop: spacing.xl }}
+                testID="practice-begin-bottom"
+              />
+              <Button
+                label="I did this without the timer"
+                variant="ghost"
+                onPress={logToday}
+                style={{ marginTop: spacing.md }}
+                testID="practice-log-button"
+              />
+            </>
+          ) : (
+            <Button label="I lived this today" onPress={logToday} style={{ marginTop: spacing.xl }} testID="practice-log-button" />
+          )}
         </View>
       </ScrollView>
     </View>

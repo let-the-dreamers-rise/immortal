@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CircleIcon as Circle, Trash, Globe, Lock } from "phosphor-react-native";
+import { CircleIcon as Circle, Trash, Globe, Lock } from "@/src/components/icons";
 import * as Haptics from "expo-haptics";
 
 import { Button, EmptyState, ErrorState, Loading, Txt } from "@/src/components/ui";
@@ -143,7 +143,7 @@ export default function JournalScreen() {
                         ) : (
                           <Lock size={14} color={colors.muted} weight="regular" />
                         )}
-                        <Pressable onPress={() => setPendingDelete(pendingDelete === l.log_id ? null : l.log_id)} hitSlop={10} testID={`journal-delete-${l.log_id}`}>
+                        <Pressable accessibilityRole="button" accessibilityLabel="Delete entry" onPress={() => setPendingDelete(pendingDelete === l.log_id ? null : l.log_id)} hitSlop={10} testID={`journal-delete-${l.log_id}`}>
                           <Trash size={15} color={pendingDelete === l.log_id ? colors.error : colors.muted} weight="regular" />
                         </Pressable>
                       </View>
@@ -151,7 +151,7 @@ export default function JournalScreen() {
                     {pendingDelete === l.log_id ? (
                       <View style={styles.confirmRow}>
                         <Txt variant="bodySm" style={{ flex: 1 }}>Remove this entry?</Txt>
-                        <Pressable onPress={() => setPendingDelete(null)} hitSlop={8} style={{ marginRight: spacing.lg }}>
+                        <Pressable accessibilityRole="button" accessibilityLabel="Delete entry" onPress={() => setPendingDelete(null)} hitSlop={8} style={{ marginRight: spacing.lg }}>
                           <Txt variant="label" color={colors.onSurfaceSecondary}>Keep</Txt>
                         </Pressable>
                         <Pressable onPress={() => remove(l.log_id)} hitSlop={8} testID={`journal-delete-confirm-${l.log_id}`}>

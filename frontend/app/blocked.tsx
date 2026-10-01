@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft } from "phosphor-react-native";
+import { CaretLeft } from "@/src/components/icons";
 
 import { Avatar, Button, EmptyState, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
@@ -42,7 +42,7 @@ export default function Blocked() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.topbar}>
-        <Pressable onPress={() => goBack(router)} hitSlop={10} testID="blocked-back">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="blocked-back">
           <CaretLeft size={22} color={colors.onSurface} weight="bold" />
         </Pressable>
         <Txt variant="label">Blocked people</Txt>

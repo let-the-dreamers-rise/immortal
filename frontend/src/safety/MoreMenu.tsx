@@ -5,8 +5,8 @@
 // reason), or block the person. Three members reporting the same thing hides
 // it until a moderator looks; blocking hides both people from each other.
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
-import { DotsThree } from "phosphor-react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput } from "react-native";
+import { DotsThree } from "@/src/components/icons";
 
 import { Button, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";

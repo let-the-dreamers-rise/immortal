@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft, GitBranch, Trash, Warning } from "phosphor-react-native";
+import { CaretLeft, GitBranch, Trash, Warning } from "@/src/components/icons";
 
 import { Avatar, Button, Chip, Divider, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
@@ -234,7 +234,7 @@ export default function LineageScreen() {
                 </Txt>
               </View>
               {n.user_id === user?.user_id ? (
-                <Pressable onPress={() => deleteNote(n.note_id)} hitSlop={10}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Delete note" onPress={() => deleteNote(n.note_id)} hitSlop={10}>
                   <Trash size={16} color={colors.muted} />
                 </Pressable>
               ) : (
@@ -290,7 +290,7 @@ const ARCHIVE_ID = "user_archive";
 function BackBar({ onBack, right }: { onBack: () => void; right?: React.ReactNode }) {
   return (
     <View style={[styles.backBar, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
-      <Pressable onPress={onBack} hitSlop={12} testID="lineage-back">
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} hitSlop={12} testID="lineage-back">
         <CaretLeft size={24} color={colors.onSurface} />
       </Pressable>
       {right}

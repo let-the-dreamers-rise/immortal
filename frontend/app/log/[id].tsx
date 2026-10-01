@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft, PaperPlaneRight, Trash } from "phosphor-react-native";
+import { CaretLeft, PaperPlaneRight, Trash } from "@/src/components/icons";
 
 import { Avatar, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
@@ -62,7 +62,7 @@ export default function LogDetail() {
 
   const topbar = (
     <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
-      <Pressable onPress={() => goBack(router)} hitSlop={10} testID="log-detail-back">
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="log-detail-back">
         <CaretLeft size={22} color={colors.onSurface} weight="bold" />
       </Pressable>
       <Txt variant="label">Reflection</Txt>
@@ -124,7 +124,7 @@ export default function LogDetail() {
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                   <Txt variant="label" style={{ fontSize: 13 }}>{c.author.display_name}</Txt>
                   {c.author.user_id === user?.user_id ? (
-                    <Pressable onPress={() => removeComment(c.comment_id)} hitSlop={8} testID={`comment-delete-${c.comment_id}`}>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Delete reply" onPress={() => removeComment(c.comment_id)} hitSlop={8} testID={`comment-delete-${c.comment_id}`}>
                       <Trash size={13} color={colors.muted} weight="regular" />
                     </Pressable>
                   ) : (
@@ -156,7 +156,7 @@ export default function LogDetail() {
             maxLength={1000}
             testID="comment-input"
           />
-          <Pressable onPress={send} disabled={sending || !text.trim()} style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]} testID="comment-send">
+          <Pressable accessibilityRole="button" accessibilityLabel="Send reply" onPress={send} disabled={sending || !text.trim()} style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]} testID="comment-send">
             <PaperPlaneRight size={20} color={colors.onBrandPrimary} weight="fill" />
           </Pressable>
         </View>

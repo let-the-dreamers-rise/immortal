@@ -1,4 +1,3 @@
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -84,14 +83,12 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
       <SafeAreaProvider>
         <KeyboardProvider>
-          <BottomSheetModalProvider>
             <AuthProvider>
               <View style={{ flex: 1, backgroundColor: colors.surface }}>
                 <StatusBar style="dark" />
                 <RootNavigator />
               </View>
             </AuthProvider>
-          </BottomSheetModalProvider>
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

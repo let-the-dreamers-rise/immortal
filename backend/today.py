@@ -142,6 +142,9 @@ def pick_suggestion(
     `seed` rotates the choice day by day so the same practice does not appear
     every morning, without needing to store what was shown.
     """
+    # Ways of living (diet, sleep, seasons) have no length and nothing to time,
+    # so they never stand in for "what do I do right now".
+    practices = [p for p in practices if p.get("seconds") or p.get("time_min")]
     by_id = {p["practice_id"]: p for p in practices}
 
     def pool(kind: str) -> list:

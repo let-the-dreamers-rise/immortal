@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X } from "phosphor-react-native";
+import { X } from "@/src/components/icons";
 
 import { Button, Chip, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
@@ -68,7 +68,7 @@ export default function NewLog() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => goBack(router)} hitSlop={10} testID="log-close-button">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="log-close-button">
           <X size={24} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
         <Txt variant="label">Today’s reflection</Txt>

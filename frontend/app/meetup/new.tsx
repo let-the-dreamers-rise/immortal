@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
-import { X, MapPin } from "phosphor-react-native";
+import { X, MapPin } from "@/src/components/icons";
 
 import { Button, Chip, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
@@ -109,7 +109,7 @@ export default function NewMeetup() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => goBack(router)} hitSlop={10} testID="meetup-close-button">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="meetup-close-button">
           <X size={24} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
         <Txt variant="label">Host a circle</Txt>

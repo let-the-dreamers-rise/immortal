@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import { Platform } from "react-native";
-import { Sun, House, BookOpen, NotePencil, UsersThree } from "phosphor-react-native";
+import { Sun, House, BookOpen, NotePencil, UsersThree } from "@/src/components/icons";
 
 import { colors, fonts } from "@/src/theme";
 

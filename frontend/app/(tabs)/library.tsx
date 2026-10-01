@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Clock } from "phosphor-react-native";
+import { Clock } from "@/src/components/icons";
 
 import { Chip, EmptyState, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage, mediaUri } from "@/src/api/client";

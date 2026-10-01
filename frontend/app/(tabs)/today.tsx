@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GearSix } from "phosphor-react-native";
+import { GearSix } from "@/src/components/icons";
 
 import { Button, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
@@ -109,7 +109,7 @@ export default function TodayScreen() {
         <Txt variant="caption" color={colors.muted}>
           {data?.phase_label ?? ""}
         </Txt>
-        <Pressable testID="today-settings-button" onPress={() => router.push("/settings")} hitSlop={12}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" testID="today-settings-button" onPress={() => router.push("/settings")} hitSlop={12}>
           <GearSix size={22} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
       </View>

@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft, MapPin, CalendarBlank, Check, Users } from "phosphor-react-native";
+import { CaretLeft, MapPin, CalendarBlank, Check, Users } from "@/src/components/icons";
 
 import { Avatar, Button, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
@@ -99,7 +99,7 @@ export default function MeetupDetail() {
 
   const topbar = (
     <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
-      <Pressable onPress={() => goBack(router)} hitSlop={10} testID="meetup-detail-back">
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="meetup-detail-back">
         <CaretLeft size={22} color={colors.onSurface} weight="bold" />
       </Pressable>
       <Txt variant="label">Practice circle</Txt>

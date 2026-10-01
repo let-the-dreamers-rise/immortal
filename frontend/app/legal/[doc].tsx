@@ -4,7 +4,7 @@
 import { ScrollView, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft } from "phosphor-react-native";
+import { CaretLeft } from "@/src/components/icons";
 
 import { Txt } from "@/src/components/ui";
 import { PRIVACY, TERMS } from "@/src/legal/generated";
@@ -71,7 +71,7 @@ export default function LegalScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.topbar}>
-        <Pressable onPress={() => goBack(router)} hitSlop={10} testID="legal-back">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="legal-back">
           <CaretLeft size={22} color={colors.onSurface} weight="bold" />
         </Pressable>
       </View>

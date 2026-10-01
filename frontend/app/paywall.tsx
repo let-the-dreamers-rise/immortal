@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X, Check } from "phosphor-react-native";
+import { X, Check } from "@/src/components/icons";
 
 import { Button, Loading, Txt } from "@/src/components/ui";
 import { useAuth } from "@/src/context/AuthContext";

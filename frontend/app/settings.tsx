@@ -3,7 +3,7 @@ import { Linking, Platform, Pressable, StyleSheet, TextInput, View } from "react
 import { useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X, SignOut, Bell, Trash, Crown, Key } from "phosphor-react-native";
+import { X, SignOut, Bell, Trash, Crown, Key } from "@/src/components/icons";
 
 import { Button, Chip, Divider, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
@@ -159,7 +159,7 @@ export default function Settings() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => goBack(router)} hitSlop={10} testID="settings-close-button">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="settings-close-button">
           <X size={24} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
         <Txt variant="label">Settings</Txt>
@@ -198,7 +198,7 @@ export default function Settings() {
             <Bell size={18} color={colors.brandPrimary} weight="regular" />
             <Txt variant="label" style={{ marginLeft: spacing.sm }}>Daily reminder</Txt>
           </View>
-          <Pressable onPress={toggleReminder} testID="reminder-toggle" style={[styles.switch, remEnabled && styles.switchOn]}>
+          <Pressable onPress={toggleReminder} accessibilityRole="switch" accessibilityLabel="Daily reminder" accessibilityState={{ checked: remEnabled }} testID="reminder-toggle" style={[styles.switch, remEnabled && styles.switchOn]}>
             <View style={[styles.knob, remEnabled && styles.knobOn]} />
           </Pressable>
         </View>
