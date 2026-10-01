@@ -14,13 +14,14 @@ streak or a leaderboard.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, tzinfo
 from typing import Awaitable, Callable, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from billing import enforcing, user_is_premium
+from localtime import client_tz, local_now
 
 FREE_LINEAGE_LIMIT = 1
 NOTE_KINDS = ("observation", "adjustment", "caution", "question")
@@ -52,12 +53,16 @@ def _as_utc(dt: datetime) -> datetime:
 
 
 def progress_for(member: Optional[dict], horizon_days: int, now: datetime) -> Optional[dict]:
-    """Days practised and days since starting, for one member of a lineage."""
+    """Days practised and days since starting, for one member of a lineage.
+
+    ``now`` is in the viewer's time zone, and the start date is read in the
+    same zone, so "day 1" and "today" are the viewer's days.
+    """
     if not member:
         return None
     days = len(member.get("checkin_dates") or [])
     started = _as_utc(member["started_at"])
-    since = (now.date() - started.date()).days + 1
+    since = (now.date() - started.astimezone(now.tzinfo or timezone.utc).date()).days + 1
     return {
         "started_at": started,
         "days_practised": days,
@@ -67,7 +72,15 @@ def progress_for(member: Optional[dict], horizon_days: int, now: datetime) -> Op
     }
 
 
-def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRouter:
+async def _no_one(_user_id: str) -> set:
+    return set()
+
+
+def build_router(
+    db,
+    get_current_user: Callable[..., Awaitable[dict]],
+    hidden_user_ids: Callable[[str], Awaitable[set]] = _no_one,
+) -> APIRouter:
     router = APIRouter()
 
     async def authors_for(ids: List[str]) -> dict:
@@ -76,13 +89,16 @@ def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRou
             async for u in db.users.find({"user_id": {"$in": list(set(ids))}}, {"_id": 0})
         }
 
-    async def get_live(lineage_id: str) -> dict:
+    async def get_live(lineage_id: str, user: Optional[dict] = None) -> dict:
         doc = await db.lineages.find_one({"lineage_id": lineage_id, "deleted_at": None}, {"_id": 0})
+        if doc and user and doc["author_id"] != user["user_id"]:
+            if doc.get("hidden") or doc["author_id"] in await hidden_user_ids(user["user_id"]):
+                doc = None
         if not doc:
             raise HTTPException(status_code=404, detail="Lineage not found")
         return doc
 
-    async def cards(docs: List[dict], user_id: str) -> List[dict]:
+    async def cards(docs: List[dict], user_id: str, now: Optional[datetime] = None) -> List[dict]:
         ids = [d["lineage_id"] for d in docs]
         authors = await authors_for([d["author_id"] for d in docs])
         members: dict = {}
@@ -97,7 +113,7 @@ def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRou
         branches: dict = {}
         async for b in db.lineages.find({"parent_id": {"$in": ids}, "deleted_at": None}, {"_id": 0, "parent_id": 1}):
             branches[b["parent_id"]] = branches.get(b["parent_id"], 0) + 1
-        now = _now()
+        now = now or _now()
         return [
             {
                 **d,
@@ -112,13 +128,19 @@ def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRou
         ]
 
     @router.get("/lineages")
-    async def list_lineages(scope: str = "all", user: dict = Depends(get_current_user)):
+    async def list_lineages(scope: str = "all", user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)):
         q: dict = {"deleted_at": None}
         if scope == "mine":
             joined = [m["lineage_id"] async for m in db.lineage_members.find({"user_id": user["user_id"]}, {"_id": 0})]
             q["$or"] = [{"author_id": user["user_id"]}, {"lineage_id": {"$in": joined}}]
-        docs = await db.lineages.find(q, {"_id": 0}).to_list(200)
-        out = await cards(docs, user["user_id"])
+        else:
+            hidden = await hidden_user_ids(user["user_id"])
+            q["hidden"] = {"$ne": True}
+            q["author_id"] = {"$nin": list(hidden)}
+        # Newest 200 at most. Before, an unsorted 200 meant that once there
+        # were more, which ones showed was down to storage order.
+        docs = await db.lineages.find(q, {"_id": 0}).sort("created_at", -1).to_list(200)
+        out = await cards(docs, user["user_id"], local_now(tz))
         # Most carried first, then newest: a lineage many people keep is the
         # most useful one to find, and that is a fact about the method.
         out.sort(key=lambda c: (c["practitioners"], c["created_at"]), reverse=True)
@@ -133,7 +155,7 @@ def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRou
                     status_code=402,
                     detail="Recording more than one lineage is part of the Inner Chamber membership.",
                 )
-        parent = await get_live(body.parent_id) if body.parent_id else None
+        parent = await get_live(body.parent_id, user) if body.parent_id else None
         doc = {
             "lineage_id": "lin_" + uuid.uuid4().hex[:12],
             "author_id": user["user_id"],
@@ -160,22 +182,35 @@ def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRou
         return {"lineage": card}
 
     @router.get("/lineages/{lineage_id}")
-    async def get_lineage(lineage_id: str, user: dict = Depends(get_current_user)):
-        doc = await get_live(lineage_id)
-        (card,) = await cards([doc], user["user_id"])
+    async def get_lineage(lineage_id: str, user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)):
+        doc = await get_live(lineage_id, user)
+        now = local_now(tz)
+        hidden = await hidden_user_ids(user["user_id"])
+        (card,) = await cards([doc], user["user_id"], now)
         parent = None
         if doc.get("parent_id"):
             p = await db.lineages.find_one({"lineage_id": doc["parent_id"], "deleted_at": None}, {"_id": 0})
             if p:
                 parent = {"lineage_id": p["lineage_id"], "title": p["title"], "chinese": p.get("chinese")}
-        branch_docs = await db.lineages.find({"parent_id": lineage_id, "deleted_at": None}, {"_id": 0}).to_list(50)
-        branches = await cards(branch_docs, user["user_id"])
-        notes = await db.lineage_notes.find({"lineage_id": lineage_id, "deleted_at": None}, {"_id": 0}).sort("created_at", -1).to_list(200)
-        members = await db.lineage_members.find({"lineage_id": lineage_id}, {"_id": 0}).to_list(500)
+        branch_docs = await db.lineages.find(
+            {"parent_id": lineage_id, "deleted_at": None, "hidden": {"$ne": True}, "author_id": {"$nin": list(hidden)}},
+            {"_id": 0},
+        ).to_list(50)
+        branches = await cards(branch_docs, user["user_id"], now)
+        notes = (
+            await db.lineage_notes.find(
+                {"lineage_id": lineage_id, "deleted_at": None, "hidden": {"$ne": True}, "user_id": {"$nin": list(hidden)}},
+                {"_id": 0},
+            )
+            .sort("created_at", -1)
+            .to_list(200)
+        )
+        members = await db.lineage_members.find(
+            {"lineage_id": lineage_id, "user_id": {"$nin": list(hidden)}}, {"_id": 0}
+        ).to_list(500)
         people = await authors_for([n["user_id"] for n in notes] + [m["user_id"] for m in members])
         for n in notes:
             n["author"] = people.get(n["user_id"], {"user_id": n["user_id"], "display_name": None})
-        now = _now()
         carriers = sorted(
             (
                 {**people.get(m["user_id"], {"user_id": m["user_id"]}), **progress_for(m, doc["horizon_days"], now)}
@@ -207,7 +242,7 @@ def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRou
 
     @router.post("/lineages/{lineage_id}/join")
     async def join(lineage_id: str, user: dict = Depends(get_current_user)):
-        await get_live(lineage_id)
+        await get_live(lineage_id, user)
         await db.lineage_members.update_one(
             {"lineage_id": lineage_id, "user_id": user["user_id"]},
             {"$setOnInsert": {"started_at": _now(), "checkin_dates": []}},
@@ -221,9 +256,10 @@ def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRou
         return {"ok": True}
 
     @router.post("/lineages/{lineage_id}/checkin")
-    async def checkin(lineage_id: str, user: dict = Depends(get_current_user)):
-        doc = await get_live(lineage_id)
-        today = _now().strftime("%Y-%m-%d")
+    async def checkin(lineage_id: str, user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)):
+        doc = await get_live(lineage_id, user)
+        now = local_now(tz)
+        today = now.strftime("%Y-%m-%d")
         res = await db.lineage_members.update_one(
             {"lineage_id": lineage_id, "user_id": user["user_id"]},
             {"$addToSet": {"checkin_dates": today}},
@@ -231,17 +267,20 @@ def build_router(db, get_current_user: Callable[..., Awaitable[dict]]) -> APIRou
         if res.matched_count == 0:
             raise HTTPException(status_code=403, detail="Take up this lineage before logging a day.")
         member = await db.lineage_members.find_one({"lineage_id": lineage_id, "user_id": user["user_id"]}, {"_id": 0})
-        return {"my_progress": progress_for(member, doc["horizon_days"], _now())}
+        return {"my_progress": progress_for(member, doc["horizon_days"], now)}
 
     @router.post("/lineages/{lineage_id}/notes")
-    async def add_note(lineage_id: str, body: NoteIn, user: dict = Depends(get_current_user)):
-        await get_live(lineage_id)
+    async def add_note(
+        lineage_id: str, body: NoteIn, user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)
+    ):
+        await get_live(lineage_id, user)
         if body.kind not in NOTE_KINDS:
             raise HTTPException(status_code=400, detail="Invalid note kind")
         member = await db.lineage_members.find_one({"lineage_id": lineage_id, "user_id": user["user_id"]}, {"_id": 0})
         day = None
         if member:
-            day = (_now().date() - _as_utc(member["started_at"]).date()).days + 1
+            now = local_now(tz)
+            day = (now.date() - _as_utc(member["started_at"]).astimezone(tz).date()).days + 1
         note = {
             "note_id": "lnote_" + uuid.uuid4().hex[:12],
             "lineage_id": lineage_id,

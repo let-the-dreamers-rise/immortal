@@ -108,7 +108,8 @@ def build_router(
         )
         # Keep this device signed in; every other session is revoked.
         token = (authorization or "").split(" ", 1)[-1].strip()
-        await db.user_sessions.delete_many({"user_id": user["user_id"], "session_token": {"$ne": token}})
+        keep = [token, hashlib.sha256(token.encode()).hexdigest()]
+        await db.user_sessions.delete_many({"user_id": user["user_id"], "session_token": {"$nin": keep}})
         fresh = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0})
         return {"ok": True, "user": public_user(fresh)}
 
@@ -171,9 +172,13 @@ def build_router(
             await db.password_resets.update_one({"email": email}, {"$inc": {"tries": 1}})
             raise invalid
         user = await db.users.find_one({"email": email}, {"_id": 0})
-        if not user:
+        if not user or user.get("suspended"):
             raise invalid
-        await db.users.update_one({"email": email}, {"$set": {"hashed_password": hash_password(body.new_password)}})
+        # The code arrived in this inbox, which proves the address.
+        await db.users.update_one(
+            {"email": email},
+            {"$set": {"hashed_password": hash_password(body.new_password), "email_verified": True}},
+        )
         await db.password_resets.delete_many({"email": email})
         await db.user_sessions.delete_many({"user_id": user["user_id"]})
         token = await create_session(user["user_id"])
@@ -198,6 +203,8 @@ def build_router(
         if str(info.get("email_verified")).lower() != "true" or not info.get("email"):
             raise HTTPException(status_code=401, detail="Your Google email is not verified.")
         user = await upsert_oauth_user(info["email"].lower(), info.get("name"), info.get("picture"), "google")
+        if user.get("suspended"):
+            raise HTTPException(status_code=403, detail="This account has been suspended.")
         token = await create_session(user["user_id"])
         return {"session_token": token, "user": public_user(user)}
 
