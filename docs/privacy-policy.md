@@ -4,9 +4,9 @@
 
 This policy explains what Immortal collects, why, who else can see it, and how to get it back or get rid of it. It describes what the app actually does, not what apps in general do.
 
-In this policy, "we" and "us" mean **[LEGAL ENTITY NAME]**, **[REGISTERED ADDRESS]**, the data fiduciary responsible for Immortal. "You" means the person using the app.
+In this policy, "we" and "us" mean **Ashwin Goyal**, an individual developer based in India, the data fiduciary responsible for Immortal. "You" means the person using the app.
 
-Questions, requests, or complaints: **[PRIVACY CONTACT EMAIL]**.
+Questions, requests, or complaints: **ashwingoyal2006@gmail.com**.
 
 ---
 
@@ -147,7 +147,7 @@ Whatever country you are in, you can ask us to:
 
 **You can delete your account yourself, in the app**, under Settings → Delete account. It takes effect immediately.
 
-**For anything else — access, correction, export, or withdrawing consent — email [PRIVACY CONTACT EMAIL].** We will respond within 30 days.
+**For anything else — access, correction, export, or withdrawing consent — email ashwingoyal2006@gmail.com.** We will respond within 30 days.
 
 Deleting your account erases your profile, every journal entry, your comments, your RSVPs, who you follow and who follows you, any practice circles you were hosting, and the lineages you recorded, the days you logged on lineages and the field notes you left. Deleting your account does not cancel a store subscription; cancel it in your Google Play or App Store settings. Nothing is anonymised and kept; it is removed. Note that anything you published publicly may already have been seen or copied by others, and deletion here cannot reach that.
 
@@ -175,7 +175,7 @@ No system is perfectly secure. If we discover a breach affecting your personal d
 
 Immortal is for adults. **You must be 18 or older to create an account.**
 
-Some practices in the app involve physical exertion and breath retention, and the community includes real-world meetings — neither is appropriate for children. We do not knowingly collect data from anyone under 18. If we learn that we have, we will delete the account and its data. If you believe a child has created an account, write to **[PRIVACY CONTACT EMAIL]**.
+Some practices in the app involve physical exertion and breath retention, and the community includes real-world meetings — neither is appropriate for children. We do not knowingly collect data from anyone under 18. If we learn that we have, we will delete the account and its data. If you believe a child has created an account, write to **ashwingoyal2006@gmail.com**.
 
 ---
 
@@ -187,8 +187,7 @@ If we change this policy in a way that materially affects your rights, we will t
 
 ## 12. Contact
 
-**[LEGAL ENTITY NAME]**
-[REGISTERED ADDRESS]
-**[PRIVACY CONTACT EMAIL]**
+**Ashwin Goyal**
+**ashwingoyal2006@gmail.com**
 
 If you are unhappy with how we have handled a privacy request, say so at that address and we will escalate it internally before you need to go to a regulator.
