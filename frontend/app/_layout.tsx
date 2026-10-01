@@ -11,6 +11,7 @@ import { StatusBar } from "expo-status-bar";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider, useAuth } from "@/src/context/AuthContext";
 import { colors, fontMap } from "@/src/theme";
+import { takePath } from "@/src/utils/pendingPath";
 
 LogBox.ignoreAllLogs(true);
 
@@ -34,13 +35,16 @@ function RootNavigator() {
     if (!user) {
       // A visitor from a shared link can read a practice and try a session
       // before deciding to sign up.
-      const open = inAuth || seg0 === "session" || seg0 === "practice";
+      // An invitation to a lineage opens its preview.
+      const invited = seg0 === "lineage" && (segments as string[])[1] !== "new";
+      const open = inAuth || seg0 === "session" || seg0 === "practice" || invited;
       if (!open) router.replace("/welcome");
     } else if (!user.onboarded) {
       if (!inOnboarding) router.replace("/onboarding");
     } else if (inAuth || inOnboarding || seg0 === undefined) {
-      // Today answers "what do I do now"; it is where a returning member lands.
-      router.replace("/(tabs)/today");
+      // Today answers "what do I do now"; it is where a returning member lands,
+      // unless they signed up from an invitation, which takes them back to it.
+      takePath().then((path) => router.replace((path ?? "/(tabs)/today") as any));
     }
   }, [user, loading, segments, router]);
 

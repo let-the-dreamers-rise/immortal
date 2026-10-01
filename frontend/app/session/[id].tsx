@@ -7,10 +7,10 @@
 // Here the phone holds the steps and the time, the screen stays awake, and
 // the day is counted with or without a word written.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { AppState, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useKeepAwake } from "expo-keep-awake";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
@@ -21,6 +21,8 @@ import { apiFetch, errorMessage } from "@/src/api/client";
 import { goBack } from "@/src/utils/navigation";
 import { useAuth } from "@/src/context/AuthContext";
 import { shareApp } from "@/src/utils/share";
+import { MoveFigure } from "@/src/practice/figure/MoveFigure";
+import { moveFor } from "@/src/practice/figure/moves";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Practice = {
@@ -58,12 +60,24 @@ function tap() {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
 
+const KEEP_AWAKE_TAG = "session";
+
 export default function Session() {
-  useKeepAwake();
+  // Keep the screen on. A browser can refuse (a hidden tab, no permission);
+  // that only means the screen may dim, so the refusal is not an error.
+  useEffect(() => {
+    activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => {});
+    return () => {
+      Promise.resolve()
+        .then(() => deactivateKeepAwake(KEEP_AWAKE_TAG))
+        .catch(() => {});
+    };
+  }, []);
   const { id, stage } = useLocalSearchParams<{ id: string; stage?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { height } = useWindowDimensions();
 
   const [p, setP] = useState<Practice | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -343,12 +357,21 @@ export default function Session() {
   }
 
   const progress = Math.min(1, elapsed / total);
+  const move = moveFor(p.practice_id, step);
 
   return (
     <View style={styles.container}>
       {top}
       <View style={styles.body}>
-        <Txt variant="caption" color={colors.brandSecondary} center>
+        {move ? (
+          <MoveFigure
+            move={move}
+            playing={phase !== "paused"}
+            size={height < 720 ? 120 : 170}
+            label={`A figure showing step ${step + 1}`}
+          />
+        ) : null}
+        <Txt variant="caption" color={colors.brandSecondary} center style={move ? { marginTop: spacing.md } : undefined}>
           STEP {step + 1} OF {steps.length}
         </Txt>
         <Txt variant="title" center style={styles.step} testID="session-step">

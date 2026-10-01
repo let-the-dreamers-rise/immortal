@@ -9,6 +9,9 @@ import { apiFetch, errorMessage } from "@/src/api/client";
 import { notify } from "@/src/utils/feedback";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, fonts, radius, spacing } from "@/src/theme";
+import { LineageActivity } from "@/src/lineages/LineageActivity";
+import type { LineageActivity as Activity } from "@/src/lineages/types";
+import { lineageNudgesFor, restoreReminder, setLineageNudges } from "@/src/utils/reminders";
 
 // The Today screen exists to answer "what do I do now" before the question is
 // asked. Everything on it is deliberately singular: one suggestion, one
@@ -60,21 +63,40 @@ function duration(p: Practice) {
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, user } = useAuth();
   const [data, setData] = useState<Today | null>(null);
+  const [lineages, setLineages] = useState<Activity[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [marking, setMarking] = useState(false);
 
+  const remEnabled = user?.reminder_enabled;
+  const remHour = user?.reminder_hour;
+  const remMinute = user?.reminder_minute;
+
+  // Lineage news is extra: if it fails, Today still works without it.
+  const loadLineages = useCallback(async () => {
+    try {
+      const res = await apiFetch<{ lineages: Activity[] }>("/lineages/activity");
+      setLineages(res.lineages);
+      if (setLineageNudges(lineageNudgesFor(res.lineages)) && remEnabled && remHour !== undefined) {
+        await restoreReminder(remHour, remMinute ?? 0);
+      }
+    } catch {
+      // keep whatever was shown
+    }
+  }, [remEnabled, remHour, remMinute]);
+
   const load = useCallback(async () => {
     setError(null);
+    loadLineages();
     try {
       setData(await apiFetch<Today>("/today"));
     } catch (e) {
       // Keep what is on screen if there is something; otherwise say so.
       setError(errorMessage(e));
     }
-  }, []);
+  }, [loadLineages]);
 
   // For a day practised away from the app: count it in one tap.
   const markDone = async () => {
@@ -217,6 +239,8 @@ export default function TodayScreen() {
                 Nothing to suggest just now.
               </Txt>
             )}
+
+            <LineageActivity items={lineages} />
 
             {data.stage_title ? (
               <Pressable

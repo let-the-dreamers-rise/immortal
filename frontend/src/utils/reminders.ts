@@ -49,6 +49,35 @@ const NUDGES: { title: string; body: string }[] = [
   },
 ];
 
+// When someone carries a lineage, two days a week the reminder is about it
+// instead: the reason to come back is the people carrying it too. The text
+// stays true however long ago it was scheduled, since it names no count.
+let lineageNudges: { title: string; body: string }[] = [];
+const LINEAGE_WEEKDAYS = [2, 5]; // Monday and Thursday
+
+export function lineageNudgesFor(lineages: { title: string; carried_recently: number }[]) {
+  return lineages.slice(0, LINEAGE_WEEKDAYS.length).map((l) => ({
+    title: `Your lineage: ${l.title}`,
+    body:
+      l.carried_recently > 0
+        ? "Others are carrying it with you. Practise, then log the day so they can see it."
+        : "Practise it today, then log the day. Whoever comes next will see it.",
+  }));
+}
+
+/** Swap in lineage reminders; returns true when they changed and the schedule should be rebuilt. */
+export function setLineageNudges(next: { title: string; body: string }[]): boolean {
+  const changed = JSON.stringify(next) !== JSON.stringify(lineageNudges);
+  lineageNudges = next;
+  return changed;
+}
+
+function nudgeFor(weekday: number) {
+  const slot = LINEAGE_WEEKDAYS.indexOf(weekday);
+  if (slot >= 0 && lineageNudges.length > 0) return lineageNudges[slot % lineageNudges.length];
+  return NUDGES[(weekday - 1) % NUDGES.length];
+}
+
 export type PermissionOutcome = "granted" | "denied" | "blocked";
 
 export async function requestReminderPermission(): Promise<PermissionOutcome> {
@@ -79,7 +108,7 @@ export async function scheduleDailyReminder(hour: number, minute: number, _path?
     // DAILY trigger repeats the text it was scheduled with forever, so the
     // rotation above never actually rotated.
     for (let weekday = 1; weekday <= 7; weekday++) {
-      const nudge = NUDGES[(weekday - 1) % NUDGES.length];
+      const nudge = nudgeFor(weekday);
       await Notifications.scheduleNotificationAsync({
         content: { title: nudge.title, body: nudge.body },
         trigger: {

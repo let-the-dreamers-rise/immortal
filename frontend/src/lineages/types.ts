@@ -37,6 +37,37 @@ export type LineageNote = {
   created_at: string;
   author: Person;
   user_id: string;
+  /** Written by whoever recorded the lineage: the closest thing it has to a teacher. */
+  from_author?: boolean;
+};
+
+export type LineagePreview = {
+  lineage_id: string;
+  title: string;
+  chinese: string;
+  summary: string;
+  horizon_days: number;
+  daily_minutes: number;
+  author_name: string | null;
+  practitioners: number;
+  carried_recently: number;
+};
+
+export type LineageActivity = {
+  lineage_id: string;
+  title: string;
+  chinese: string;
+  carried_recently: number;
+  recent_names: string[];
+  new_notes: number;
+  latest_note: {
+    author: string | null;
+    from_author: boolean;
+    kind: LineageNote["kind"];
+    body: string;
+    created_at: string;
+  } | null;
+  checked_in_today: boolean;
 };
 
 export type Carrier = Person & Progress;

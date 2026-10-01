@@ -12,9 +12,18 @@ import { goBack } from "@/src/utils/navigation";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import { LineageCard } from "@/src/lineages/LineageCard";
+import { LineagePreview } from "@/src/lineages/LineagePreview";
+import { shareLineage } from "@/src/utils/share";
 import { horizonLabel, NOTE_KINDS, type LineageDetail, type LineageNote } from "@/src/lineages/types";
 
-export default function LineageScreen() {
+export default function LineageRoute() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
+  // Someone opening an invitation without an account sees a preview.
+  return user ? <LineageScreen /> : <LineagePreview id={id} />;
+}
+
+function LineageScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -100,6 +109,9 @@ export default function LineageScreen() {
 
   const { lineage: l, notes, branches, carriers } = data;
   const p = l.my_progress;
+  // The latest word from whoever recorded it sits above the method, the way
+  // a teacher's correction would.
+  const teacherNote = notes.find((n) => n.from_author);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -179,6 +191,25 @@ export default function LineageScreen() {
           )}
         </View>
 
+        <Button
+          label={l.practitioners > 1 ? "Invite someone to carry it with you" : "Invite someone to carry it"}
+          variant="secondary"
+          small
+          onPress={() => shareLineage(l.lineage_id, l.title, l.daily_minutes)}
+          style={{ marginTop: spacing.lg }}
+          testID="lineage-invite"
+        />
+
+        {teacherNote ? (
+          <View style={styles.teacher} testID="lineage-teacher-note">
+            <Txt variant="caption" color={colors.brandSecondary}>
+              A WORD FROM {(teacherNote.author.display_name ?? "whoever recorded it").toUpperCase()}
+              {teacherNote.day ? ` · DAY ${teacherNote.day}` : ""}
+            </Txt>
+            <Txt variant="body" style={{ marginTop: spacing.sm }}>{teacherNote.body}</Txt>
+          </View>
+        ) : null}
+
         <Section title="The method" />
         {l.author.user_id !== ARCHIVE_ID ? (
           <Txt variant="caption" style={{ marginBottom: spacing.sm }}>
@@ -229,6 +260,7 @@ export default function LineageScreen() {
               <View style={{ flex: 1 }}>
                 <Txt variant="label">{n.author.display_name ?? "A practitioner"}</Txt>
                 <Txt variant="caption">
+                  {n.from_author ? "RECORDED IT · " : ""}
                   {n.kind.toUpperCase()}
                   {n.day ? ` · DAY ${n.day}` : ""} · {new Date(n.created_at).toLocaleDateString()}
                 </Txt>
@@ -343,5 +375,13 @@ const styles = StyleSheet.create({
     marginVertical: spacing.md,
   },
   note: { paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.divider },
+  teacher: {
+    marginTop: spacing.xl,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.brandSecondary,
+    backgroundColor: colors.surfaceSecondary,
+  },
   carrier: { flexDirection: "row", alignItems: "center", paddingVertical: spacing.sm },
 });

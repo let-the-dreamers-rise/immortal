@@ -82,6 +82,56 @@ def test_validation(client, user):
     assert client.post("/api/lineages", json={**BASE, "parent_id": "lin_missing"}, headers=user["headers"]).status_code == 404
 
 
+def test_activity_shows_who_practised_and_unseen_notes(client, user, other):
+    lid = client.post("/api/lineages", json=BASE, headers=user["headers"]).json()["lineage"]["lineage_id"]
+    client.post(f"/api/lineages/{lid}/join", headers=other["headers"])
+    client.post(f"/api/lineages/{lid}/checkin", headers=other["headers"])
+    client.post(f"/api/lineages/{lid}/notes", json={"body": "Calves ached on day one."}, headers=other["headers"])
+
+    acts = client.get("/api/lineages/activity", headers=user["headers"]).json()["lineages"]
+    a = next(x for x in acts if x["lineage_id"] == lid)
+    assert a["carried_recently"] == 1 and a["recent_names"] == ["Tester"]
+    assert a["new_notes"] == 1
+    assert a["latest_note"]["body"] == "Calves ached on day one." and a["latest_note"]["from_author"] is False
+    assert a["checked_in_today"] is False
+
+    # Opening the lineage marks the note as read.
+    client.get(f"/api/lineages/{lid}", headers=user["headers"])
+    a = next(x for x in client.get("/api/lineages/activity", headers=user["headers"]).json()["lineages"] if x["lineage_id"] == lid)
+    assert a["new_notes"] == 0
+
+    # My own day and notes are not "activity" to me.
+    mine = next(x for x in client.get("/api/lineages/activity", headers=other["headers"]).json()["lineages"] if x["lineage_id"] == lid)
+    assert mine["carried_recently"] == 0 and mine["checked_in_today"] is True
+
+
+def test_activity_is_empty_without_lineages(client, user):
+    assert client.get("/api/lineages/activity", headers=user["headers"]).json() == {"lineages": []}
+    assert client.get("/api/lineages/activity").status_code == 401
+
+
+def test_notes_from_the_author_are_marked(client, user, other):
+    lid = client.post("/api/lineages", json=BASE, headers=user["headers"]).json()["lineage"]["lineage_id"]
+    client.post(f"/api/lineages/{lid}/join", headers=other["headers"])
+    teacher = client.post(f"/api/lineages/{lid}/notes", json={"body": "Keep the knees soft.", "kind": "adjustment"}, headers=user["headers"])
+    assert teacher.json()["note"]["from_author"] is True
+    client.post(f"/api/lineages/{lid}/notes", json={"body": "Thank you."}, headers=other["headers"])
+    notes = client.get(f"/api/lineages/{lid}", headers=other["headers"]).json()["notes"]
+    assert {n["body"]: n["from_author"] for n in notes} == {"Keep the knees soft.": True, "Thank you.": False}
+
+
+def test_preview_is_public_and_minimal(client, user):
+    lid = client.post("/api/lineages", json=BASE, headers=user["headers"]).json()["lineage"]["lineage_id"]
+    r = client.get(f"/api/lineages/{lid}/preview")
+    assert r.status_code == 200
+    p = r.json()["lineage"]
+    assert p["title"] == BASE["title"] and p["author_name"] == "Tester" and p["practitioners"] == 1
+    # The method stays behind sign-in, and no account details leak.
+    assert "method" not in p and "author_id" not in p
+    client.delete(f"/api/lineages/{lid}", headers=user["headers"])
+    assert client.get(f"/api/lineages/{lid}/preview").status_code == 404
+
+
 def test_account_deletion_erases_lineage_data(client, user, other):
     parent = client.post("/api/lineages", json=BASE, headers=user["headers"]).json()["lineage"]
     branch = client.post("/api/lineages", json={**BASE, "parent_id": parent["lineage_id"]}, headers=other["headers"]).json()["lineage"]

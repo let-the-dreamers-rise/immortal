@@ -14,7 +14,7 @@ streak or a leaderboard.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Awaitable, Callable, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,6 +25,11 @@ from localtime import client_tz, local_now
 
 FREE_LINEAGE_LIMIT = 1
 NOTE_KINDS = ("observation", "adjustment", "caution", "question")
+# "Carried it recently" means logged a day within this window. A day is
+# dated in each member's own time zone, so a 24-hour window is the honest
+# way to compare members across the world.
+RECENT = timedelta(hours=24)
+ACTIVITY_LIMIT = 20
 
 
 class LineageIn(BaseModel):
@@ -181,6 +186,93 @@ def build_router(
         (card,) = await cards([doc], user["user_id"])
         return {"lineage": card}
 
+    @router.get("/lineages/activity")
+    async def activity(user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)):
+        """What happened in the lineages I carry: who else practised, and notes I have not seen."""
+        uid = user["user_id"]
+        mine = await db.lineage_members.find({"user_id": uid}, {"_id": 0}).to_list(ACTIVITY_LIMIT)
+        if not mine:
+            return {"lineages": []}
+        hidden = list(await hidden_user_ids(uid))
+        others = {"$nin": [uid, *hidden]}
+        docs = {
+            d["lineage_id"]: d
+            async for d in db.lineages.find(
+                {"lineage_id": {"$in": [m["lineage_id"] for m in mine]}, "deleted_at": None, "hidden": {"$ne": True}},
+                {"_id": 0},
+            )
+        }
+        now = _now()
+        today = local_now(tz).strftime("%Y-%m-%d")
+        out = []
+        for m in mine:
+            d = docs.get(m["lineage_id"])
+            if not d:
+                continue
+            lid = d["lineage_id"]
+            recent = await db.lineage_members.find(
+                {"lineage_id": lid, "user_id": others, "last_checkin_at": {"$gte": now - RECENT}}, {"_id": 0, "user_id": 1}
+            ).to_list(200)
+            seen = _as_utc(m.get("last_seen_at") or m["started_at"])
+            unseen = await db.lineage_notes.count_documents(
+                {"lineage_id": lid, "user_id": others, "deleted_at": None, "hidden": {"$ne": True}, "created_at": {"$gt": seen}}
+            )
+            latest = await db.lineage_notes.find(
+                {"lineage_id": lid, "user_id": others, "deleted_at": None, "hidden": {"$ne": True}}, {"_id": 0}
+            ).sort("created_at", -1).to_list(1)
+            names = await authors_for([r["user_id"] for r in recent[:3]] + [n["user_id"] for n in latest])
+            out.append(
+                {
+                    "lineage_id": lid,
+                    "title": d["title"],
+                    "chinese": d.get("chinese", ""),
+                    "carried_recently": len(recent),
+                    "recent_names": [names[r["user_id"]]["display_name"] for r in recent[:3] if r["user_id"] in names],
+                    "new_notes": unseen,
+                    "latest_note": (
+                        {
+                            "author": names.get(latest[0]["user_id"], {}).get("display_name"),
+                            "from_author": latest[0]["user_id"] == d["author_id"],
+                            "kind": latest[0]["kind"],
+                            "body": latest[0]["body"][:200],
+                            "created_at": latest[0]["created_at"],
+                        }
+                        if latest
+                        else None
+                    ),
+                    "checked_in_today": today in (m.get("checkin_dates") or []),
+                }
+            )
+        out.sort(key=lambda a: (a["new_notes"], a["carried_recently"]), reverse=True)
+        return {"lineages": out}
+
+    @router.get("/lineages/{lineage_id}/preview")
+    async def preview(lineage_id: str):
+        """What an invited person sees before they have an account."""
+        doc = await db.lineages.find_one(
+            {"lineage_id": lineage_id, "deleted_at": None, "hidden": {"$ne": True}}, {"_id": 0}
+        )
+        if not doc:
+            raise HTTPException(status_code=404, detail="Lineage not found")
+        author = await db.users.find_one({"user_id": doc["author_id"]}, {"_id": 0, "display_name": 1})
+        carrying = await db.lineage_members.count_documents({"lineage_id": lineage_id})
+        recent = await db.lineage_members.count_documents(
+            {"lineage_id": lineage_id, "last_checkin_at": {"$gte": _now() - RECENT}}
+        )
+        return {
+            "lineage": {
+                "lineage_id": lineage_id,
+                "title": doc["title"],
+                "chinese": doc.get("chinese", ""),
+                "summary": doc["summary"],
+                "horizon_days": doc["horizon_days"],
+                "daily_minutes": doc["daily_minutes"],
+                "author_name": (author or {}).get("display_name"),
+                "practitioners": carrying,
+                "carried_recently": recent,
+            }
+        }
+
     @router.get("/lineages/{lineage_id}")
     async def get_lineage(lineage_id: str, user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)):
         doc = await get_live(lineage_id, user)
@@ -211,6 +303,11 @@ def build_router(
         people = await authors_for([n["user_id"] for n in notes] + [m["user_id"] for m in members])
         for n in notes:
             n["author"] = people.get(n["user_id"], {"user_id": n["user_id"], "display_name": None})
+            n["from_author"] = n["user_id"] == doc["author_id"]
+        # Opening a lineage marks its notes as read for the Today screen.
+        await db.lineage_members.update_one(
+            {"lineage_id": lineage_id, "user_id": user["user_id"]}, {"$set": {"last_seen_at": _now()}}
+        )
         carriers = sorted(
             (
                 {**people.get(m["user_id"], {"user_id": m["user_id"]}), **progress_for(m, doc["horizon_days"], now)}
@@ -262,7 +359,7 @@ def build_router(
         today = now.strftime("%Y-%m-%d")
         res = await db.lineage_members.update_one(
             {"lineage_id": lineage_id, "user_id": user["user_id"]},
-            {"$addToSet": {"checkin_dates": today}},
+            {"$addToSet": {"checkin_dates": today}, "$set": {"last_checkin_at": _now()}},
         )
         if res.matched_count == 0:
             raise HTTPException(status_code=403, detail="Take up this lineage before logging a day.")
@@ -273,7 +370,7 @@ def build_router(
     async def add_note(
         lineage_id: str, body: NoteIn, user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)
     ):
-        await get_live(lineage_id, user)
+        doc = await get_live(lineage_id, user)
         if body.kind not in NOTE_KINDS:
             raise HTTPException(status_code=400, detail="Invalid note kind")
         member = await db.lineage_members.find_one({"lineage_id": lineage_id, "user_id": user["user_id"]}, {"_id": 0})
@@ -293,6 +390,7 @@ def build_router(
         }
         await db.lineage_notes.insert_one(dict(note))
         note["author"] = {"user_id": user["user_id"], "display_name": user.get("display_name"), "picture": user.get("picture")}
+        note["from_author"] = doc["author_id"] == user["user_id"]
         return {"note": note}
 
     @router.delete("/lineage-notes/{note_id}")
