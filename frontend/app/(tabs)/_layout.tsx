@@ -4,6 +4,8 @@ import { Sun, House, BookOpen, NotePencil, UsersThree } from "phosphor-react-nat
 
 import { colors, fonts } from "@/src/theme";
 
+export const unstable_settings = { initialRouteName: "today" };
+
 export default function TabsLayout() {
   return (
     <Tabs

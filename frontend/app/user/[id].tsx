@@ -4,8 +4,11 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CaretLeft } from "phosphor-react-native";
 
-import { Avatar, Button, EmptyState, Loading, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { Avatar, Button, EmptyState, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage } from "@/src/api/client";
+import { useAuth } from "@/src/context/AuthContext";
+import { MoreMenu } from "@/src/safety/MoreMenu";
+import { goBack } from "@/src/utils/navigation";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Profile = {
@@ -28,42 +31,68 @@ export default function UserProfile() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [following, setFollowing] = useState(false);
+  const { user } = useAuth();
 
   const load = useCallback(async () => {
-    const res = await apiFetch<{ profile: Profile; logs: Log[] }>(`/community/users/${id}`);
-    setProfile(res.profile);
-    setLogs(res.logs);
+    setError(null);
+    try {
+      const res = await apiFetch<{ profile: Profile; logs: Log[] }>(`/community/users/${id}`);
+      setProfile(res.profile);
+      setLogs(res.logs);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const toggle = async () => {
-    if (!profile) return;
+    if (!profile || following) return;
+    setFollowing(true);
     setProfile({ ...profile, is_following: !profile.is_following, followers: profile.followers + (profile.is_following ? -1 : 1) });
     try {
       await apiFetch(`/community/users/${id}/follow`, { method: profile.is_following ? "DELETE" : "POST" });
     } catch {
       load();
+    } finally {
+      setFollowing(false);
     }
   };
+
+  const topbar = (
+    <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
+      <Pressable onPress={() => goBack(router)} hitSlop={10} testID="user-back-button">
+        <CaretLeft size={22} color={colors.onSurface} weight="bold" />
+      </Pressable>
+      <Txt variant="label">Practitioner</Txt>
+      {profile && profile.user_id !== user?.user_id ? (
+        <MoreMenu
+          kind="user"
+          targetId={profile.user_id}
+          authorId={profile.user_id}
+          authorName={profile.display_name}
+          onBlocked={() => goBack(router)}
+        />
+      ) : (
+        <View style={{ width: 22 }} />
+      )}
+    </View>
+  );
 
   if (!profile) {
     return (
       <View style={styles.container}>
-        <Loading />
+        {topbar}
+        {error ? <ErrorState message={error} onRetry={load} /> : <Loading />}
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="user-back-button">
-          <CaretLeft size={22} color={colors.onSurface} weight="bold" />
-        </Pressable>
-        <Txt variant="label">Practitioner</Txt>
-        <View style={{ width: 22 }} />
-      </View>
+      {topbar}
 
       <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: insets.bottom + spacing.xl }} showsVerticalScrollIndicator={false}>
         <View style={{ alignItems: "center" }}>

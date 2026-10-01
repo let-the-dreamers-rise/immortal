@@ -9,6 +9,7 @@ import { Button, Chip, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import type { Lineage, LineageDetail } from "@/src/lineages/types";
+import { goBack } from "@/src/utils/navigation";
 
 const HORIZONS = [
   { days: 40, label: "40 days" },
@@ -90,7 +91,7 @@ export default function NewLineage() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="lineage-new-close">
+        <Pressable onPress={() => goBack(router)} hitSlop={10} testID="lineage-new-close">
           <X size={24} color={colors.onSurfaceSecondary} />
         </Pressable>
         <Txt variant="label">{parent ? "New branch" : "Record a lineage"}</Txt>

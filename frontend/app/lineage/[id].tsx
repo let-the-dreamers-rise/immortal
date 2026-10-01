@@ -1,11 +1,14 @@
 import { useCallback, useState } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CaretLeft, GitBranch, Trash, Warning } from "phosphor-react-native";
 
-import { Avatar, Button, Chip, Divider, Loading, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { Avatar, Button, Chip, Divider, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage } from "@/src/api/client";
+import { MoreMenu } from "@/src/safety/MoreMenu";
+import { confirmAction, notify } from "@/src/utils/feedback";
+import { goBack } from "@/src/utils/navigation";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import { LineageCard } from "@/src/lineages/LineageCard";
@@ -27,20 +30,21 @@ export default function LineageScreen() {
     try {
       setError(null);
       setData(await apiFetch<LineageDetail>(`/lineages/${id}`));
-    } catch (e: any) {
-      setError(e?.message ?? "Could not load this lineage.");
+    } catch (e) {
+      setError(errorMessage(e));
     }
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const act = async (fn: () => Promise<unknown>) => {
+    if (busy) return;
     setBusy(true);
     try {
       await fn();
       await load();
-    } catch (e: any) {
-      Alert.alert("Something went wrong", e?.message ?? "Please try again.");
+    } catch (e) {
+      notify("Something went wrong", errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -48,27 +52,25 @@ export default function LineageScreen() {
 
   const join = () => act(() => apiFetch(`/lineages/${id}/join`, { method: "POST" }));
   const checkin = () => act(() => apiFetch(`/lineages/${id}/checkin`, { method: "POST" }));
-  const leave = () =>
-    Alert.alert("Set this lineage down?", "Your logged days for it will be cleared. Your notes stay.", [
-      { text: "Keep carrying", style: "cancel" },
-      { text: "Set down", style: "destructive", onPress: () => act(() => apiFetch(`/lineages/${id}/join`, { method: "DELETE" })) },
-    ]);
-  const remove = () =>
-    Alert.alert("Delete this lineage?", "Everyone carrying it will lose it. Branches stay.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await apiFetch(`/lineages/${id}`, { method: "DELETE" });
-            router.back();
-          } catch (e: any) {
-            Alert.alert("Could not delete", e?.message ?? "Please try again.");
-          }
-        },
-      },
-    ]);
+  const leave = async () => {
+    const ok = await confirmAction(
+      "Set this lineage down?",
+      "Your logged days for it will be cleared. Your notes stay.",
+      "Set down",
+      true
+    );
+    if (ok) act(() => apiFetch(`/lineages/${id}/join`, { method: "DELETE" }));
+  };
+  const remove = async () => {
+    const ok = await confirmAction("Delete this lineage?", "Everyone carrying it will lose it. Branches stay.", "Delete", true);
+    if (!ok) return;
+    try {
+      await apiFetch(`/lineages/${id}`, { method: "DELETE" });
+      goBack(router);
+    } catch (e) {
+      notify("Could not delete", errorMessage(e));
+    }
+  };
 
   const addNote = () => {
     const body = noteBody.trim();
@@ -90,8 +92,8 @@ export default function LineageScreen() {
   if (!data) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <BackBar onBack={() => router.back()} />
-        {error ? <Txt variant="bodySm" color={colors.error} center style={{ marginTop: spacing.xl }}>{error}</Txt> : <Loading />}
+        <BackBar onBack={() => goBack(router)} />
+        {error ? <ErrorState message={error} onRetry={load} /> : <Loading />}
       </View>
     );
   }
@@ -101,7 +103,20 @@ export default function LineageScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <BackBar onBack={() => router.back()} />
+      <BackBar
+        onBack={() => goBack(router)}
+        right={
+          !l.is_author && l.author.user_id !== ARCHIVE_ID ? (
+            <MoreMenu
+              kind="lineage"
+              targetId={l.lineage_id}
+              authorId={l.author.user_id}
+              authorName={l.author.display_name}
+              onBlocked={() => goBack(router)}
+            />
+          ) : null
+        }
+      />
       <ScrollView
         contentContainerStyle={{ padding: spacing.xl, paddingBottom: insets.bottom + spacing.xxl }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandPrimary} />}
@@ -165,6 +180,11 @@ export default function LineageScreen() {
         </View>
 
         <Section title="The method" />
+        {l.author.user_id !== ARCHIVE_ID ? (
+          <Txt variant="caption" style={{ marginBottom: spacing.sm }}>
+            Written by a member and not checked by Immortal. Go gently, and stop if anything feels wrong.
+          </Txt>
+        ) : null}
         <Txt variant="body">{l.method}</Txt>
 
         {l.cautions ? (
@@ -217,7 +237,15 @@ export default function LineageScreen() {
                 <Pressable onPress={() => deleteNote(n.note_id)} hitSlop={10}>
                   <Trash size={16} color={colors.muted} />
                 </Pressable>
-              ) : null}
+              ) : (
+                <MoreMenu
+                  kind="note"
+                  targetId={n.note_id}
+                  authorId={n.user_id}
+                  authorName={n.author.display_name}
+                  onBlocked={load}
+                />
+              )}
             </View>
             <Txt variant="body" style={{ marginTop: spacing.sm }}>{n.body}</Txt>
           </View>
@@ -257,12 +285,15 @@ export default function LineageScreen() {
   );
 }
 
-function BackBar({ onBack }: { onBack: () => void }) {
+const ARCHIVE_ID = "user_archive";
+
+function BackBar({ onBack, right }: { onBack: () => void; right?: React.ReactNode }) {
   return (
-    <View style={styles.backBar}>
+    <View style={[styles.backBar, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
       <Pressable onPress={onBack} hitSlop={12} testID="lineage-back">
         <CaretLeft size={24} color={colors.onSurface} />
       </Pressable>
+      {right}
     </View>
   );
 }

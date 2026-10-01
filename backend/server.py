@@ -779,7 +779,12 @@ async def create_log(body: LogIn, user: dict = Depends(get_current_user), tz: tz
         "deleted_at": None,
     }
     await db.logs.insert_one(dict(log))
-    await bump_stage_checkin(user["user_id"], body.stage_order, log["date"])
+    # A stage counts a day whenever one of its practices is done, from
+    # wherever it was started (Today, the library, the stage page).
+    stage_orders = {body.stage_order} if body.stage_order is not None else set()
+    stage_orders |= {st["order"] for st in STAGES if set(st["practices"]) & set(log["practice_ids"])}
+    for order in stage_orders:
+        await bump_stage_checkin(user["user_id"], order, log["date"])
     await refresh_practice_summary(user["user_id"])
     log.pop("deleted_at", None)
     return {"log": log, "growth": growth_for(len(await practice_dates(user["user_id"])))}
@@ -999,8 +1004,10 @@ async def create_meetup(body: MeetupIn, user: dict = Depends(get_current_user)):
         "city": body.city.strip(),
         "starts_at": normalise_start(body.starts_at),
         "capacity": body.capacity,
-        "lat": body.lat,
-        "lng": body.lng,
+        # About a kilometre: enough to sort circles by distance, not enough to
+        # pinpoint the host's home if they created it from there.
+        "lat": round(body.lat, 2) if body.lat is not None else None,
+        "lng": round(body.lng, 2) if body.lng is not None else None,
         "created_at": now_utc(),
         "deleted_at": None,
     }

@@ -4,8 +4,12 @@ import { apiFetch, setAuthToken } from "@/src/api/client";
 import { getGoogleIdToken, googleSignOut, nativeGoogleAvailable } from "@/src/auth/google";
 import * as purchases from "@/src/billing/purchases";
 import { storage } from "@/src/utils/storage";
+import { restoreReminder } from "@/src/utils/reminders";
 
 const TOKEN_KEY = "immortality_session_token";
+// The last profile the server returned, so a phone with no signal (or a
+// server having a bad minute) opens the app instead of the sign-in screen.
+const USER_CACHE_KEY = "immortality_user_cache";
 
 export type User = {
   user_id: string;
@@ -23,6 +27,7 @@ export type User = {
   has_password?: boolean;
   is_premium?: boolean;
   premium_expires_at?: string | null;
+  is_moderator?: boolean;
 };
 
 type Providers = { google: boolean; password_reset: boolean };
@@ -58,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clearLocal = useCallback(async () => {
     setAuthToken(null);
     await storage.secureRemove(TOKEN_KEY);
+    await storage.removeItem(USER_CACHE_KEY);
     setUserState(null);
     setDeviceEntitled(false);
     await purchases.forget();
@@ -67,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const startSession = useCallback(async (res: SessionResponse) => {
     setAuthToken(res.session_token);
     await storage.secureSet(TOKEN_KEY, res.session_token);
+    await storage.setItem(USER_CACHE_KEY, JSON.stringify(res.user));
     setUserState(res.user);
   }, []);
 
@@ -74,9 +81,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await apiFetch<{ user: User }>("/auth/me");
       setUserState(res.user);
+      await storage.setItem(USER_CACHE_KEY, JSON.stringify(res.user));
     } catch (e: any) {
       // Only a rejected session signs you out; a flaky network should not.
-      if (e?.status === 401) await clearLocal();
+      if (e?.status === 401) {
+        await clearLocal();
+        return;
+      }
+      const cached = await storage.getItem<string>(USER_CACHE_KEY, "");
+      if (cached) {
+        try {
+          setUserState((u) => u ?? (JSON.parse(cached) as User));
+        } catch {
+          // A corrupt cache is the same as none.
+        }
+      }
     }
   }, [clearLocal]);
 
@@ -99,6 +118,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(setProviders)
       .catch(() => {});
   }, [refresh]);
+
+  // A reminder saved on the account comes back on a new phone or after a
+  // reinstall. Scheduling never asks for permission; without it this no-ops.
+  const remEnabled = user?.reminder_enabled;
+  const remHour = user?.reminder_hour;
+  const remMinute = user?.reminder_minute;
+  useEffect(() => {
+    if (remEnabled && remHour !== undefined) {
+      restoreReminder(remHour, remMinute ?? 0).catch(() => {});
+    }
+  }, [remEnabled, remHour, remMinute]);
 
   // Tie RevenueCat to the signed-in account and follow entitlement changes.
   const userId = user?.user_id;
@@ -182,7 +212,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const setUser = useCallback((u: User) => setUserState(u), []);
+  const setUser = useCallback((u: User) => {
+    setUserState(u);
+    storage.setItem(USER_CACHE_KEY, JSON.stringify(u)).catch(() => {});
+  }, []);
 
   const value = useMemo<AuthState>(
     () => ({

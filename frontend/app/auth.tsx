@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Eye, EyeSlash } from "phosphor-react-native";
@@ -24,6 +25,7 @@ const COPY: Record<Mode, { title: string; sub: string; cta: string }> = {
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { register, login, signInWithGoogle, requestPasswordReset, resetPassword, providers } = useAuth();
   const [mode, setMode] = useState<Mode>("register");
   const [email, setEmail] = useState("");
@@ -105,7 +107,7 @@ export default function AuthScreen() {
             長生
           </Txt>
           <Txt variant="subtitle" color={colors.onSurfaceInverse} style={{ marginTop: spacing.xs, opacity: 0.9 }}>
-            A path toward a longer, quieter life
+            Five quiet minutes a day, from a tradition that never stopped hoping
           </Txt>
         </View>
       </View>
@@ -189,7 +191,7 @@ export default function AuthScreen() {
               <Txt variant="caption" style={{ marginHorizontal: spacing.md }}>OR</Txt>
               <View style={styles.line} />
             </View>
-            <Button label="Continue with Google" variant="ghost" onPress={google} testID="auth-google-button" />
+            <Button label="Continue with Google" variant="ghost" onPress={google} disabled={busy} testID="auth-google-button" />
           </>
         ) : null}
 
@@ -207,8 +209,16 @@ export default function AuthScreen() {
         </Pressable>
 
         <Txt variant="caption" center style={styles.disclaimer}>
-          This is historical exploration, not medical advice. By continuing you accept our approach to
-          personal, non-clinical practice.
+          This is historical exploration and personal practice, not medical advice. By continuing you confirm
+          you are 18 or older and agree to the{" "}
+          <Txt variant="caption" color={colors.brandPrimary} onPress={() => router.push("/legal/terms")}>
+            Terms
+          </Txt>{" "}
+          and{" "}
+          <Txt variant="caption" color={colors.brandPrimary} onPress={() => router.push("/legal/privacy")}>
+            Privacy Policy
+          </Txt>
+          .
         </Txt>
       </KeyboardAwareScrollView>
     </View>
@@ -237,6 +247,7 @@ function PasswordField({ label, testID, ...props }: FieldProps) {
           {...props}
           testID={testID}
           secureTextEntry={!visible}
+          maxLength={128}
           autoCapitalize="none"
           autoCorrect={false}
           placeholderTextColor={colors.muted}

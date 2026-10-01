@@ -79,7 +79,9 @@ When you mark an entry public, you are choosing to publish it to other users. Ot
 - Someone else's private information
 - Deliberately false claims about your practice or its results
 
-We may remove content that breaks these rules and suspend or terminate accounts that do so repeatedly. We are not obliged to monitor content, and we do not pre-screen it.
+Lineages and field notes have one more rule: **do not post a method that is likely to hurt someone who follows it** (for example, long breath-holding, fasting beyond a day, or anything that tells people to stop medical treatment). Write cautions honestly.
+
+**Reporting and blocking.** Every post, reply, lineage, note, circle and profile has a report option, and you can block any member. When several members report the same item it is hidden until a moderator reviews it. We review reports and may remove content that breaks these rules and suspend or terminate accounts that do so. We are not obliged to monitor content, and we do not pre-screen it.
 
 ---
 

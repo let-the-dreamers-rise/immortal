@@ -6,8 +6,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CaretLeft, Warning, Clock, Barbell } from "phosphor-react-native";
 
-import { Button, Loading, Txt } from "@/src/components/ui";
-import { apiFetch, mediaUri } from "@/src/api/client";
+import { Button, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage, mediaUri } from "@/src/api/client";
+import { goBack } from "@/src/utils/navigation";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Practice = {
@@ -17,6 +18,7 @@ type Practice = {
   category: string;
   difficulty: string;
   time_min: number;
+  seconds?: number;
   origin_text: string;
   historical_context: string;
   modern_understanding: string;
@@ -32,18 +34,29 @@ export default function PracticeDetail() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [p, setP] = useState<Practice | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiFetch<{ practice: Practice }>(`/practices/${id}`).then((r) => setP(r.practice)).catch(() => setP(null));
-  }, [id]);
+  const load = () => {
+    setError(null);
+    apiFetch<{ practice: Practice }>(`/practices/${id}`)
+      .then((r) => setP(r.practice))
+      .catch((e) => setError(errorMessage(e)));
+  };
+
+  useEffect(load, [id]);
 
   if (!p) {
     return (
-      <View style={styles.container}>
-        <Loading />
+      <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable style={{ padding: spacing.lg }} onPress={() => goBack(router)} hitSlop={10}>
+          <CaretLeft size={22} color={colors.onSurface} weight="bold" />
+        </Pressable>
+        {error ? <ErrorState message={error} onRetry={load} /> : <Loading />}
       </View>
     );
   }
+
+  const minutes = p.seconds ? `${p.seconds} sec` : `${p.time_min || 5} min`;
 
   const grad: [string, string] = p.tradition === "dao" ? ["#8C9A86", "#5E6C58"] : ["#C7A97C", "#8C7A6B"];
 
@@ -56,7 +69,7 @@ export default function PracticeDetail() {
             <Image source={{ uri: mediaUri(p.illustration_url) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={400} />
           ) : null}
           <LinearGradient colors={["rgba(26,25,24,0.15)", "rgba(26,25,24,0.55)"]} style={StyleSheet.absoluteFill} />
-          <Pressable style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => router.back()} testID="practice-back-button" hitSlop={10}>
+          <Pressable style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => goBack(router)} testID="practice-back-button" hitSlop={10}>
             <CaretLeft size={22} color={colors.onSurfaceInverse} weight="bold" />
           </Pressable>
           <View style={styles.heroContent}>
@@ -71,6 +84,13 @@ export default function PracticeDetail() {
             {p.time_min > 0 ? <Meta icon={<Clock size={16} color={colors.brandSecondary} weight="regular" />} label={`${p.time_min} min`} /> : null}
             <Meta label={p.category} />
           </View>
+
+          <Button
+            label={`Begin · ${minutes}`}
+            onPress={() => router.push(`/session/${p.practice_id}`)}
+            style={{ marginTop: spacing.lg }}
+            testID="practice-begin-button"
+          />
 
           {p.safety_note ? (
             <View style={styles.safety}>
@@ -115,9 +135,16 @@ export default function PracticeDetail() {
           </Section>
 
           <Button
-            label="Log this practice"
-            onPress={() => router.push(`/log/new?practice=${p.practice_id}`)}
+            label={`Begin · ${minutes}`}
+            onPress={() => router.push(`/session/${p.practice_id}`)}
             style={{ marginTop: spacing.xl }}
+            testID="practice-begin-bottom"
+          />
+          <Button
+            label="I did this without the timer"
+            variant="ghost"
+            onPress={() => router.push(`/log/new?practice=${p.practice_id}`)}
+            style={{ marginTop: spacing.md }}
             testID="practice-log-button"
           />
         </View>

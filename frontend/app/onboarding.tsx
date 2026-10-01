@@ -6,7 +6,7 @@ import { YinYang, Sparkle } from "phosphor-react-native";
 
 import { Button, Txt } from "@/src/components/ui";
 import { useAuth } from "@/src/context/AuthContext";
-import { apiFetch } from "@/src/api/client";
+import { apiFetch, errorMessage } from "@/src/api/client";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 // The guided curriculum is Daoist, and only Daoist. Offering a standalone
@@ -24,16 +24,20 @@ export default function Onboarding() {
   const [intention, setIntention] = useState("");
   const [choice, setChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
-    if (!choice) return;
+    if (!choice || busy) return;
     setBusy(true);
+    setError(null);
     try {
       const res = await apiFetch<{ user: any }>("/auth/onboarding", {
         method: "POST",
-        body: { intention: intention.trim() || "To live well, for longer.", path_choice: choice },
+        body: { intention: intention.trim() || "To practise a little, every day.", path_choice: choice },
       });
       setUser(res.user);
+    } catch (e) {
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -60,6 +64,7 @@ export default function Onboarding() {
           placeholder="I want to move through my later years with clarity and calm…"
           placeholderTextColor={colors.muted}
           multiline
+          maxLength={500}
           style={styles.intentionInput}
           testID="onboarding-intention-input"
         />
@@ -96,6 +101,11 @@ export default function Onboarding() {
       </KeyboardAwareScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+        {error ? (
+          <Txt variant="bodySm" color={colors.error} style={{ marginBottom: spacing.sm }} testID="onboarding-error">
+            {error}
+          </Txt>
+        ) : null}
         <Button
           label="Enter the path"
           onPress={submit}

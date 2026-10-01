@@ -75,24 +75,36 @@ export async function scheduleDailyReminder(hour: number, minute: number, _path?
         importance: Notifications.AndroidImportance.DEFAULT,
       });
     }
-    // Day-of-year rotation: a different nudge each day without storing state.
-    const dayIndex = Math.floor(Date.now() / 86400000);
-    const nudge = NUDGES[dayIndex % NUDGES.length];
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: nudge.title,
-        body: nudge.body,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
-        channelId: "daily-practice",
-      },
-    });
+    // One weekly notification per weekday, each with its own nudge. A single
+    // DAILY trigger repeats the text it was scheduled with forever, so the
+    // rotation above never actually rotated.
+    for (let weekday = 1; weekday <= 7; weekday++) {
+      const nudge = NUDGES[(weekday - 1) % NUDGES.length];
+      await Notifications.scheduleNotificationAsync({
+        content: { title: nudge.title, body: nudge.body },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday,
+          hour,
+          minute,
+          channelId: "daily-practice",
+        },
+      });
+    }
   } catch {
     // scheduling unsupported (e.g. Expo Go Android) — no-op
   }
+}
+
+/** Re-create a saved reminder (new phone, reinstall) only if permission is already given. */
+export async function restoreReminder(hour: number, minute: number) {
+  if (Platform.OS === "web") return;
+  try {
+    if (!(await Notifications.getPermissionsAsync()).granted) return;
+  } catch {
+    return;
+  }
+  await scheduleDailyReminder(hour, minute);
 }
 
 export async function cancelDailyReminder() {

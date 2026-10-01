@@ -9,7 +9,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "legal": "node scripts/build-legal.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "6.1.2",
@@ -26,6 +27,7 @@
     "expo-font": "14.0.12",
     "expo-haptics": "15.0.8",
     "expo-image": "3.0.11",
+    "expo-keep-awake": "15.0.8",
     "expo-linear-gradient": "15.0.8",
     "expo-linking": "8.0.12",
     "expo-location": "~19.0.8",

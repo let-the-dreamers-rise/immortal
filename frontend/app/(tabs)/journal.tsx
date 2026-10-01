@@ -5,8 +5,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CircleIcon as Circle, Trash, Globe, Lock } from "phosphor-react-native";
 import * as Haptics from "expo-haptics";
 
-import { Button, EmptyState, Loading, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { Button, EmptyState, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage } from "@/src/api/client";
+import { notify } from "@/src/utils/feedback";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, radius, spacing } from "@/src/theme";
 
@@ -38,13 +39,16 @@ export default function JournalScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [posting, setPosting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       const res = await apiFetch<{ logs: Log[] }>("/logs/me");
       setLogs(res.logs);
-    } catch {
-      setLogs([]);
+    } catch (e) {
+      // An empty timeline would read as "you have written nothing"; say what happened instead.
+      setError(errorMessage(e));
     }
   }, []);
 
@@ -59,11 +63,14 @@ export default function JournalScreen() {
   };
 
   const logNothing = async () => {
+    if (posting) return;
     setPosting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     try {
       await apiFetch("/logs", { method: "POST", body: { nothing_happened: true, visibility: "private" } });
       await load();
+    } catch (e) {
+      notify("Not saved", errorMessage(e));
     } finally {
       setPosting(false);
     }
@@ -71,7 +78,11 @@ export default function JournalScreen() {
 
   const remove = async (id: string) => {
     setPendingDelete(null);
-    await apiFetch(`/logs/${id}`, { method: "DELETE" });
+    try {
+      await apiFetch(`/logs/${id}`, { method: "DELETE" });
+    } catch (e) {
+      notify("Could not delete", errorMessage(e));
+    }
     load();
   };
 
@@ -82,7 +93,9 @@ export default function JournalScreen() {
         <Txt variant="bodySm" style={{ marginTop: 2 }}>A quiet record of your practice — however it went.</Txt>
       </View>
 
-      {!logs ? (
+      {!logs && error ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : !logs ? (
         <Loading />
       ) : (
         <ScrollView

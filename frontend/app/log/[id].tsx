@@ -5,9 +5,12 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CaretLeft, PaperPlaneRight, Trash } from "phosphor-react-native";
 
-import { Avatar, Loading, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { Avatar, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage } from "@/src/api/client";
 import { useAuth } from "@/src/context/AuthContext";
+import { MoreMenu } from "@/src/safety/MoreMenu";
+import { notify } from "@/src/utils/feedback";
+import { goBack } from "@/src/utils/navigation";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Author = { user_id: string; display_name: string; picture?: string | null };
@@ -23,22 +26,30 @@ export default function LogDetail() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await apiFetch<{ log: Log; comments: Comment[] }>(`/logs/${id}`);
-    setLog(res.log);
-    setComments(res.comments);
+    setError(null);
+    try {
+      const res = await apiFetch<{ log: Log; comments: Comment[] }>(`/logs/${id}`);
+      setLog(res.log);
+      setComments(res.comments);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const send = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() || sending) return;
     setSending(true);
     try {
       const res = await apiFetch<{ comment: Comment }>(`/logs/${id}/comments`, { method: "POST", body: { body: text.trim() } });
       setComments((c) => [...c, res.comment]);
       setText("");
+    } catch (e) {
+      notify("Your reply was not sent", errorMessage(e));
     } finally {
       setSending(false);
     }
@@ -49,23 +60,38 @@ export default function LogDetail() {
     await apiFetch(`/comments/${cid}`, { method: "DELETE" }).catch(() => load());
   };
 
+  const topbar = (
+    <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
+      <Pressable onPress={() => goBack(router)} hitSlop={10} testID="log-detail-back">
+        <CaretLeft size={22} color={colors.onSurface} weight="bold" />
+      </Pressable>
+      <Txt variant="label">Reflection</Txt>
+      {log && log.author.user_id !== user?.user_id ? (
+        <MoreMenu
+          kind="log"
+          targetId={log.log_id}
+          authorId={log.author.user_id}
+          authorName={log.author.display_name}
+          onBlocked={() => goBack(router)}
+        />
+      ) : (
+        <View style={{ width: 22 }} />
+      )}
+    </View>
+  );
+
   if (!log) {
     return (
       <View style={styles.container}>
-        <Loading />
+        {topbar}
+        {error ? <ErrorState message={error} onRetry={load} /> : <Loading />}
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="log-detail-back">
-          <CaretLeft size={22} color={colors.onSurface} weight="bold" />
-        </Pressable>
-        <Txt variant="label">Reflection</Txt>
-        <View style={{ width: 22 }} />
-      </View>
+      {topbar}
 
       <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Pressable style={styles.authorRow} onPress={() => router.push(`/user/${log.author.user_id}`)} testID="log-detail-author">
@@ -101,7 +127,15 @@ export default function LogDetail() {
                     <Pressable onPress={() => removeComment(c.comment_id)} hitSlop={8} testID={`comment-delete-${c.comment_id}`}>
                       <Trash size={13} color={colors.muted} weight="regular" />
                     </Pressable>
-                  ) : null}
+                  ) : (
+                    <MoreMenu
+                      kind="comment"
+                      targetId={c.comment_id}
+                      authorId={c.author.user_id}
+                      authorName={c.author.display_name}
+                      onBlocked={load}
+                    />
+                  )}
                 </View>
                 <Txt variant="body" style={{ marginTop: 2 }}>{c.body}</Txt>
               </View>
@@ -119,6 +153,7 @@ export default function LogDetail() {
             placeholderTextColor={colors.muted}
             style={styles.input}
             multiline
+            maxLength={1000}
             testID="comment-input"
           />
           <Pressable onPress={send} disabled={sending || !text.trim()} style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]} testID="comment-send">

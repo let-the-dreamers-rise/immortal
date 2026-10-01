@@ -6,8 +6,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Clock } from "phosphor-react-native";
 
-import { Chip, EmptyState, Loading, Txt } from "@/src/components/ui";
-import { apiFetch, mediaUri } from "@/src/api/client";
+import { Chip, EmptyState, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage, mediaUri } from "@/src/api/client";
 import { colors, radius, spacing } from "@/src/theme";
 
 const { width } = Dimensions.get("window");
@@ -49,16 +49,18 @@ export default function LibraryScreen() {
   const [items, setItems] = useState<Practice[] | null>(null);
   const [mode, setMode] = useState<"practices" | "teachings">("practices");
   const [teachings, setTeachings] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setItems(null);
+    setError(null);
     try {
       const res = await apiFetch<{ practices: Practice[] }>(
         `/practices?tradition=${tradition}&difficulty=${difficulty}`
       );
       setItems(res.practices);
-    } catch {
-      setItems([]);
+    } catch (e) {
+      setError(errorMessage(e));
     }
   }, [tradition, difficulty]);
 
@@ -127,6 +129,8 @@ export default function LibraryScreen() {
             </Pressable>
           ))}
         </ScrollView>
+      ) : !items && error ? (
+        <ErrorState message={error} onRetry={load} />
       ) : !items ? (
         <Loading />
       ) : items.length === 0 ? (

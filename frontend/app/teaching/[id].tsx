@@ -8,6 +8,7 @@ import { CaretLeft, BookOpen } from "phosphor-react-native";
 import { Loading, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
 import { colors, fonts, radius, spacing } from "@/src/theme";
+import { goBack } from "@/src/utils/navigation";
 
 type Teaching = {
   teaching_id: string;
@@ -41,7 +42,7 @@ export default function TeachingDetail() {
     <View style={styles.container}>
       <View style={styles.hero}>
         <LinearGradient colors={["#5E6C58", "#3D4A45"]} style={StyleSheet.absoluteFill} />
-        <Pressable style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => router.back()} testID="teaching-back-button" hitSlop={10}>
+        <Pressable style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => goBack(router)} testID="teaching-back-button" hitSlop={10}>
           <CaretLeft size={22} color={colors.onSurfaceInverse} weight="bold" />
         </Pressable>
         <View style={styles.heroContent}>

@@ -255,6 +255,23 @@ export function EmptyState({
   );
 }
 
+/** A failed load: what went wrong, and a way to try again. Never an endless spinner. */
+export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <View style={styles.center} testID="error-state">
+      <Txt variant="title" center>Not this time</Txt>
+      <Txt variant="bodySm" center style={{ marginTop: spacing.sm, maxWidth: 300 }}>
+        {message}
+      </Txt>
+      {onRetry ? (
+        <View style={{ marginTop: spacing.xl }}>
+          <Button label="Try again" variant="secondary" small onPress={onRetry} testID="error-retry" />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   btn: {
     borderRadius: radius.pill,
