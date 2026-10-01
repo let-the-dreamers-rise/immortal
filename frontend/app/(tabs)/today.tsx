@@ -52,6 +52,8 @@ type Today = {
 
 function duration(p: Practice) {
   if (p.seconds) return `${p.seconds} seconds`;
+  // Long sets open as their five-minute version (see the session screen).
+  if (p.time_min > 5) return `5 min, or the full ${p.time_min}`;
   return `${p.time_min} min`;
 }
 

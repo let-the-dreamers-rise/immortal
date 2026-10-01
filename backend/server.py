@@ -424,6 +424,7 @@ async def delete_account(body: DeleteAccountIn, user: dict = Depends(get_current
 
 @api.post("/auth/onboarding")
 async def onboarding(body: OnboardingIn, user: dict = Depends(get_current_user)):
+    # Older app builds still offer "both"; everyone walks the Dao path now.
     if body.path_choice not in ("dao", "ayurveda", "both"):
         raise HTTPException(status_code=400, detail="Invalid path choice")
     await db.users.update_one(
@@ -1329,8 +1330,18 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Seeding + illustration generation
 # ---------------------------------------------------------------------------
+# Immortal is Chinese Dao practice only (Ash, 2026-10-01). The Ayurveda
+# entries stay in the seed files so old logs that name them still open, but
+# they are retired: never listed, never suggested.
+LIVE_TRADITIONS = ("dao",)
+
+
+def practice_status(p: dict) -> str:
+    return "approved" if p.get("tradition") in LIVE_TRADITIONS else "retired"
+
+
 def seed_fingerprint() -> str:
-    blob = json.dumps([PRACTICES, FOUNDING_LINEAGES, ARCHIVE_USER], sort_keys=True, default=str)
+    blob = json.dumps([PRACTICES, FOUNDING_LINEAGES, ARCHIVE_USER, LIVE_TRADITIONS], sort_keys=True, default=str)
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
@@ -1343,7 +1354,7 @@ async def seed_content():
         return
     for i, p in enumerate(PRACTICES):
         existing = await db.practices.find_one({"practice_id": p["practice_id"]}, {"_id": 0})
-        doc = {**p, "order": i, "status": "approved"}
+        doc = {**p, "order": i, "status": practice_status(p)}
         if existing:
             doc["illustration_path"] = existing.get("illustration_path")
             await db.practices.update_one({"practice_id": p["practice_id"]}, {"$set": doc})

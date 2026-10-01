@@ -16,6 +16,7 @@ const CARD_W = (width - spacing.xl * 2 - GAP) / 2;
 
 type Practice = {
   practice_id: string;
+  seconds?: number;
   title: string;
   tradition: string;
   category: string;
@@ -25,26 +26,30 @@ type Practice = {
   has_illustration: boolean;
 };
 
-const TRADITIONS = [
-  { key: "all", label: "All" },
-  { key: "dao", label: "Dao" },
-  { key: "ayurveda", label: "Ayurveda" },
+// How much time someone has is the first question, not which school.
+const LENGTHS = [
+  { key: "all", label: "Any length" },
+  { key: "quick", label: "5 min or less" },
+  { key: "longer", label: "Longer sets" },
+  { key: "daily", label: "Ways of living" },
 ];
+
+function lengthOf(p: Practice) {
+  if (p.seconds || (p.time_min > 0 && p.time_min <= 5)) return "quick";
+  return p.time_min > 0 ? "longer" : "daily";
+}
 const DIFFICULTIES = [
   { key: "all", label: "Any level" },
   { key: "beginner", label: "Beginner" },
   { key: "intermediate", label: "Intermediate" },
 ];
 
-const GRADS: Record<string, [string, string]> = {
-  dao: ["#8C9A86", "#5E6C58"],
-  ayurveda: ["#C7A97C", "#8C7A6B"],
-};
+const GRAD: [string, string] = ["#8C9A86", "#5E6C58"];
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [tradition, setTradition] = useState("all");
+  const [length, setLength] = useState("all");
   const [difficulty, setDifficulty] = useState("all");
   const [items, setItems] = useState<Practice[] | null>(null);
   const [mode, setMode] = useState<"practices" | "teachings">("practices");
@@ -56,17 +61,19 @@ export default function LibraryScreen() {
     setError(null);
     try {
       const res = await apiFetch<{ practices: Practice[] }>(
-        `/practices?tradition=${tradition}&difficulty=${difficulty}`
+        `/practices?tradition=dao&difficulty=${difficulty}`
       );
       setItems(res.practices);
     } catch (e) {
       setError(errorMessage(e));
     }
-  }, [tradition, difficulty]);
+  }, [difficulty]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const shown = items && (length === "all" ? items : items.filter((p) => lengthOf(p) === length));
 
   useEffect(() => {
     apiFetch<{ teachings: any[] }>("/teachings").then((r) => setTeachings(r.teachings)).catch(() => setTeachings([]));
@@ -97,8 +104,8 @@ export default function LibraryScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chipRow}
             >
-              {TRADITIONS.map((t) => (
-                <Chip key={t.key} label={t.label} active={tradition === t.key} onPress={() => setTradition(t.key)} testID={`filter-tradition-${t.key}`} />
+              {LENGTHS.map((t) => (
+                <Chip key={t.key} label={t.label} active={length === t.key} onPress={() => setLength(t.key)} testID={`filter-length-${t.key}`} />
               ))}
             </ScrollView>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
@@ -129,15 +136,15 @@ export default function LibraryScreen() {
             </Pressable>
           ))}
         </ScrollView>
-      ) : !items && error ? (
+      ) : !shown && error ? (
         <ErrorState message={error} onRetry={load} />
-      ) : !items ? (
+      ) : !shown ? (
         <Loading />
-      ) : items.length === 0 ? (
-        <EmptyState title="Nothing here yet" body="No practices found for this filter. Try another tradition or level." />
+      ) : shown.length === 0 ? (
+        <EmptyState title="Nothing here yet" body="No practices found for this filter. Try another length or level." />
       ) : (
         <FlatList
-          data={items}
+          data={shown}
           keyExtractor={(p) => p.practice_id}
           numColumns={2}
           columnWrapperStyle={{ gap: GAP, paddingHorizontal: spacing.xl }}
@@ -150,7 +157,7 @@ export default function LibraryScreen() {
               onPress={() => router.push(`/practice/${item.practice_id}`)}
             >
               <View style={styles.thumb}>
-                <LinearGradient colors={GRADS[item.tradition] || GRADS.dao} style={StyleSheet.absoluteFill} />
+                <LinearGradient colors={GRAD} style={StyleSheet.absoluteFill} />
                 {item.has_illustration ? (
                   <Image
                     source={{ uri: mediaUri(item.illustration_url) }}
@@ -159,9 +166,13 @@ export default function LibraryScreen() {
                     transition={300}
                   />
                 ) : null}
-                <View style={styles.thumbTag}>
-                  <Txt variant="caption" color={colors.onSurfaceInverse}>{item.tradition === "dao" ? "DAO" : "AYURVEDA"}</Txt>
-                </View>
+                {!item.has_illustration ? (
+                  <View style={styles.thumbLabel}>
+                    <Txt variant="title" center color={colors.onSurfaceInverse} numberOfLines={2}>
+                      {item.title.split(" — ")[0]}
+                    </Txt>
+                  </View>
+                ) : null}
               </View>
               <Txt variant="label" numberOfLines={2} style={{ marginTop: spacing.sm }}>{item.title}</Txt>
               <View style={styles.metaRow}>
@@ -204,15 +215,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: colors.surfaceTertiary,
   },
-  thumbTag: {
-    position: "absolute",
-    top: spacing.sm,
-    left: spacing.sm,
-    backgroundColor: "rgba(26,25,24,0.45)",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.pill,
-  },
+  thumbLabel: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", padding: spacing.md },
   metaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   time: { flexDirection: "row", alignItems: "center" },
 });

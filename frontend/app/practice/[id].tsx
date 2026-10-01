@@ -59,10 +59,10 @@ export default function PracticeDetail() {
   // Some practices are ways of living (diet, sleep, seasons), not something
   // you time. Those get "I did this today" instead of a meaningless timer.
   const timed = !!p.seconds || p.time_min > 0;
-  const minutes = p.seconds ? `${p.seconds} sec` : `${p.time_min} min`;
+  const minutes = p.seconds ? `${p.seconds} sec` : p.time_min > 5 ? "5 min or longer" : `${p.time_min} min`;
   const logToday = () => router.push(`/log/new?practice=${p.practice_id}`);
 
-  const grad: [string, string] = p.tradition === "dao" ? ["#8C9A86", "#5E6C58"] : ["#C7A97C", "#8C7A6B"];
+  const grad: [string, string] = ["#8C9A86", "#5E6C58"];
 
   return (
     <View style={styles.container}>
@@ -77,7 +77,7 @@ export default function PracticeDetail() {
             <CaretLeft size={22} color={colors.onSurfaceInverse} weight="bold" />
           </Pressable>
           <View style={styles.heroContent}>
-            <Txt variant="caption" color={colors.onSurfaceInverse} style={{ opacity: 0.85 }}>{p.tradition === "dao" ? "DAO TRADITION" : "AYURVEDA"}</Txt>
+            <Txt variant="caption" color={colors.onSurfaceInverse} style={{ opacity: 0.85 }}>DAO TRADITION</Txt>
             <Txt variant="display" color={colors.onSurfaceInverse} style={{ fontSize: 34, lineHeight: 38, marginTop: 2 }}>{p.title}</Txt>
           </View>
         </View>

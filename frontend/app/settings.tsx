@@ -13,6 +13,7 @@ import * as purchases from "@/src/billing/purchases";
 import { cancelDailyReminder, requestReminderPermission, scheduleDailyReminder } from "@/src/utils/reminders";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import { goBack } from "@/src/utils/navigation";
+import { shareApp } from "@/src/utils/share";
 
 const TIME_PRESETS = [
   { h: 6, m: 0, label: "6:00 AM" },
@@ -296,6 +297,9 @@ export default function Settings() {
 
         <Divider style={{ marginVertical: spacing.xxl }} />
 
+        <Pressable onPress={shareApp} style={styles.logout} testID="settings-share-link">
+          <Txt variant="bodySm" color={colors.brandPrimary}>Share Immortal with someone</Txt>
+        </Pressable>
         <Pressable onPress={() => router.push("/blocked")} style={styles.logout} testID="settings-blocked-link">
           <Txt variant="bodySm" color={colors.onSurfaceSecondary}>Blocked people</Txt>
         </Pressable>

@@ -266,3 +266,19 @@ def test_account_deletion_clears_blocks_and_reports(client, user, other):
     uid = user["user"]["user_id"]
     assert run(server.db.blocks.find_one({"blocker_id": uid})) is None
     assert run(server.db.reports.find_one({"reporter_id": uid})) is None
+
+
+def test_only_dao_practices_are_listed_but_old_ones_still_open(client, user):
+    listed = client.get("/api/practices").json()["practices"]
+    assert listed and {p["tradition"] for p in listed} == {"dao"}
+    # A log from before the change can still open the practice it names.
+    assert client.get("/api/practices/dinacharya").status_code == 200
+    today = client.get("/api/today", headers=user["headers"]).json()
+    assert today["suggestion"]["tradition"] == "dao"
+
+
+def test_first_ever_suggestion_is_a_seated_minute(client, user):
+    # Every offset from -12h to +14h, so every phase of the day is covered.
+    for hours in range(-12, 15):
+        s = client.get("/api/today", headers={**user["headers"], "X-UTC-Offset": str(hours * 60)}).json()["suggestion"]
+        assert s["seconds"], (hours, s["practice_id"])

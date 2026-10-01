@@ -14,7 +14,7 @@ Contact: **ashwingoyal2006@gmail.com**
 
 **Immortal is not medical advice, medical treatment, or a healthcare service. It does not diagnose, treat, cure, mitigate, or prevent any disease or condition.**
 
-The app presents traditional Daoist and Ayurvedic practices as **historical material and personal exploration**. Where it describes what those traditions claimed, it is reporting what a tradition claimed — not telling you it is true, and not telling you it will happen to you. Where it cites modern research, it is summarising published work, not making a promise about your body.
+The app presents traditional Chinese Daoist practices as **historical material and personal exploration**. Where it describes what those traditions claimed, it is reporting what a tradition claimed — not telling you it is true, and not telling you it will happen to you. Where it cites modern research, it is summarising published work, not making a promise about your body.
 
 **We are not your doctor. We do not know your medical history. We have never examined you.**
 
@@ -29,7 +29,7 @@ Talk to a qualified healthcare professional before starting any new physical or 
 - have a recent injury, surgery, or any condition affecting balance or mobility
 - take medication that affects blood pressure, heart rate, or consciousness
 
-**If something hurts, stop. If something feels wrong, stop.** Use the "something felt wrong" flag so we can see it. If you think you are having a medical emergency, stop using the app and call your local emergency number.
+**If something hurts, stop. If something feels wrong, stop.** Then tell us at **ashwingoyal2006@gmail.com** so we can look at the practice. If you think you are having a medical emergency, stop using the app and call your local emergency number.
 
 ---
 

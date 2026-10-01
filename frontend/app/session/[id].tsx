@@ -12,12 +12,15 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeepAwake } from "expo-keep-awake";
 import * as Haptics from "expo-haptics";
+import * as Speech from "expo-speech";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { CaretLeft, Pause, Play, SkipForward } from "@/src/components/icons";
 
 import { Button, Chip, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage } from "@/src/api/client";
 import { goBack } from "@/src/utils/navigation";
+import { useAuth } from "@/src/context/AuthContext";
+import { shareApp } from "@/src/utils/share";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Practice = {
@@ -44,6 +47,13 @@ function clock(sec: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+const SHORT_SECONDS = 5 * 60;
+
+function say(text: string) {
+  Speech.stop();
+  Speech.speak(text, { rate: 0.9, pitch: 1.0 });
+}
+
 function tap() {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
@@ -53,6 +63,7 @@ export default function Session() {
   const { id, stage } = useLocalSearchParams<{ id: string; stage?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
 
   const [p, setP] = useState<Practice | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -64,6 +75,12 @@ export default function Session() {
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [growth, setGrowth] = useState<Growth | null>(null);
+  // Most sets run 15 to 25 minutes; the promise is five. Outside the Path a
+  // long practice starts as its five-minute version, and the full length is
+  // one tap away.
+  const [short, setShort] = useState(!stage);
+  // Steps read aloud, so the eyes can close and nobody has to read mid-practice.
+  const [voice, setVoice] = useState(true);
 
   // Wall-clock based, so a locked screen or a busy JS thread cannot slow the
   // timer down: elapsed = time already banked + time since the last start.
@@ -86,8 +103,10 @@ export default function Session() {
   const total = useMemo(() => {
     if (!p) return 300;
     if (p.seconds) return p.seconds;
-    return Math.max(60, (p.time_min || 5) * 60);
-  }, [p]);
+    const full = Math.max(60, (p.time_min || 5) * 60);
+    return short ? Math.min(full, SHORT_SECONDS) : full;
+  }, [p, short]);
+  const canShorten = !!p && !p.seconds && (p.time_min || 0) * 60 > SHORT_SECONDS;
 
   const steps = p?.instructions?.length ? p.instructions : ["Rest the attention on the breath."];
   const perStep = total / steps.length;
@@ -114,9 +133,21 @@ export default function Session() {
   // A gentle tap on each new step, so the eyes can stay closed.
   const lastStep = useRef(0);
   useEffect(() => {
-    if (phase === "running" && step !== lastStep.current) tap();
+    if (phase === "running" && step !== lastStep.current) {
+      tap();
+      if (voice) say(steps[step]);
+    }
     lastStep.current = step;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, phase]);
+
+  // A spoken close, so someone with closed eyes knows the time is up.
+  useEffect(() => {
+    if (phase === "finish" && voice) say("That is the practice. Open your eyes when you are ready.");
+    if (phase === "paused" || phase === "saved") Speech.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+  useEffect(() => () => void Speech.stop(), []);
 
   // Coming back to the app re-reads the clock at once.
   useEffect(() => {
@@ -129,6 +160,7 @@ export default function Session() {
   }, [total]);
 
   const start = () => {
+    if (phase === "ready" && voice) say(steps[step]);
     startedAt.current = Date.now();
     setPhase("running");
     tap();
@@ -221,6 +253,13 @@ export default function Session() {
             style={{ marginTop: spacing.xxl, alignSelf: "stretch" }}
             testID="session-done"
           />
+          <Button
+            label="Invite someone to practise too"
+            variant="ghost"
+            onPress={shareApp}
+            style={{ marginTop: spacing.md, alignSelf: "stretch" }}
+            testID="session-share"
+          />
         </View>
       </View>
     );
@@ -237,40 +276,67 @@ export default function Session() {
         >
           <Txt variant="displaySm">Finished.</Txt>
           <Txt variant="bodySm" color={colors.muted} style={{ marginTop: spacing.xs }}>
-            {clock(banked.current || elapsed)} of practice. Count today, with or without a word about it.
+            {clock(banked.current || elapsed)} of practice.{user ? " Count today, with or without a word about it." : ""}
           </Txt>
 
-          <Txt variant="caption" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>HOW WAS IT? (OPTIONAL)</Txt>
-          <View style={styles.moods}>
-            {MOODS.map((m) => (
-              <Chip
-                key={m.key}
-                label={m.label}
-                active={mood === m.key}
-                onPress={() => setMood(mood === m.key ? null : m.key)}
-                testID={`session-mood-${m.key}`}
-              />
-            ))}
-          </View>
-          <TextInput
-            value={body}
-            onChangeText={setBody}
-            placeholder="A line about it, if you like. Nothing noticed is a fine answer."
-            placeholderTextColor={colors.muted}
-            multiline
-            maxLength={5000}
-            style={styles.input}
-            testID="session-note"
-          />
+          {user ? (
+            <>
+            <Txt variant="caption" style={{ marginTop: spacing.xl, marginBottom: spacing.sm }}>HOW WAS IT? (OPTIONAL)</Txt>
+            <View style={styles.moods}>
+              {MOODS.map((m) => (
+                <Chip
+                  key={m.key}
+                  label={m.label}
+                  active={mood === m.key}
+                  onPress={() => setMood(mood === m.key ? null : m.key)}
+                  testID={`session-mood-${m.key}`}
+                />
+              ))}
+            </View>
+            <TextInput
+              value={body}
+              onChangeText={setBody}
+              placeholder="A line about it, if you like. Nothing noticed is a fine answer."
+              placeholderTextColor={colors.muted}
+              multiline
+              maxLength={5000}
+              style={styles.input}
+              testID="session-note"
+            />
+            </>
+          ) : null}
           {saveErr ? (
             <Txt variant="bodySm" color={colors.error} style={{ marginTop: spacing.md }}>
               {saveErr}
             </Txt>
           ) : null}
-          <Button label="Count today" onPress={save} loading={saving} style={{ marginTop: spacing.xl }} testID="session-save" />
-          <Txt variant="caption" center style={{ marginTop: spacing.md }}>
-            Saved privately to your journal. You can share reflections from there.
-          </Txt>
+          {user ? (
+            <>
+              <Button label="Count today" onPress={save} loading={saving} style={{ marginTop: spacing.xl }} testID="session-save" />
+              <Txt variant="caption" center style={{ marginTop: spacing.md }}>
+                Saved privately to your journal. You can share reflections from there.
+              </Txt>
+            </>
+          ) : (
+            <>
+              <Button
+                label="Create a free account to keep your days"
+                onPress={() => router.replace("/auth?mode=register")}
+                style={{ marginTop: spacing.xl }}
+                testID="session-guest-register"
+              />
+              <Button
+                label="Back"
+                variant="ghost"
+                onPress={() => router.replace("/welcome")}
+                style={{ marginTop: spacing.md }}
+                testID="session-guest-back"
+              />
+              <Txt variant="caption" center style={{ marginTop: spacing.md }}>
+                That was the whole practice. An account counts your days and picks the next one for you.
+              </Txt>
+            </>
+          )}
         </KeyboardAwareScrollView>
       </View>
     );
@@ -302,7 +368,26 @@ export default function Session() {
         </View>
 
         {phase === "ready" ? (
-          <Button label="Begin" onPress={start} style={{ marginTop: spacing.xl }} testID="session-begin" />
+          <>
+            <View style={styles.options}>
+              {canShorten ? (
+                <>
+                  <Chip label="5 min" active={short} onPress={() => setShort(true)} testID="session-short" />
+                  <Chip label={`Full ${p.time_min} min`} active={!short} onPress={() => setShort(false)} testID="session-full" />
+                </>
+              ) : null}
+              <Chip
+                label={voice ? "Voice on" : "Voice off"}
+                active={voice}
+                onPress={() => {
+                  if (voice) Speech.stop();
+                  setVoice(!voice);
+                }}
+                testID="session-voice"
+              />
+            </View>
+            <Button label="Begin" onPress={start} style={{ marginTop: spacing.lg }} testID="session-begin" />
+          </>
         ) : (
           <View style={styles.controls}>
             <Pressable
@@ -336,6 +421,7 @@ export default function Session() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
+  options: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm, marginTop: spacing.xl },
   topbar: {
     flexDirection: "row",
     alignItems: "center",

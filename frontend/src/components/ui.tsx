@@ -137,6 +137,8 @@ export function Chip({
   return (
     <Pressable
       testID={testID}
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!active }}
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
         onPress();

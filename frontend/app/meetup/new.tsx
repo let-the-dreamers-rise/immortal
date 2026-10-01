@@ -11,11 +11,6 @@ import { apiFetch } from "@/src/api/client";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import { goBack } from "@/src/utils/navigation";
 
-const TRADITIONS = [
-  { key: "dao", label: "Dao" },
-  { key: "ayurveda", label: "Ayurveda" },
-  { key: "mixed", label: "Mixed" },
-];
 const HOURS = [6, 7, 8, 9, 12, 17, 18, 19];
 
 function nextDays(n: number) {
@@ -47,7 +42,6 @@ export default function NewMeetup() {
   const days = useMemo(() => nextDays(14), []);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [tradition, setTradition] = useState("dao");
   const [locationName, setLocationName] = useState("");
   const [city, setCity] = useState("");
   const [dayKey, setDayKey] = useState(days[1].key);
@@ -90,7 +84,7 @@ export default function NewMeetup() {
         body: {
           title: title.trim(),
           description: description.trim(),
-          tradition,
+          tradition: "dao",
           location_name: locationName.trim(),
           city: city.trim(),
           starts_at: starts.toISOString(),
@@ -122,13 +116,6 @@ export default function NewMeetup() {
 
         <Lbl>WHAT TO EXPECT</Lbl>
         <TextInput value={description} onChangeText={setDescription} placeholder="A gentle group practice, all levels welcome…" placeholderTextColor={colors.muted} multiline maxLength={1000} style={[styles.input, { minHeight: 90, textAlignVertical: "top" }]} testID="meetup-desc-input" />
-
-        <Lbl>TRADITION</Lbl>
-        <View style={styles.chips}>
-          {TRADITIONS.map((t) => (
-            <Chip key={t.key} label={t.label} active={tradition === t.key} onPress={() => setTradition(t.key)} testID={`meetup-tradition-${t.key}`} />
-          ))}
-        </View>
 
         <Lbl>PUBLIC LOCATION</Lbl>
         <TextInput value={locationName} onChangeText={setLocationName} placeholder="e.g. Riverside Park pavilion" placeholderTextColor={colors.muted} maxLength={140} style={styles.input} testID="meetup-location-input" />

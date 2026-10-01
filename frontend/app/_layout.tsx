@@ -26,13 +26,16 @@ function RootNavigator() {
   useEffect(() => {
     if (loading) return;
     const seg0 = segments[0];
-    const inAuth = seg0 === "auth";
+    const inAuth = seg0 === "auth" || seg0 === "welcome";
     const inOnboarding = seg0 === "onboarding";
     // Terms and Privacy are readable by anyone, signed in or not.
     if (seg0 === "legal") return;
 
     if (!user) {
-      if (!inAuth) router.replace("/auth");
+      // A visitor from a shared link can read a practice and try a session
+      // before deciding to sign up.
+      const open = inAuth || seg0 === "session" || seg0 === "practice";
+      if (!open) router.replace("/welcome");
     } else if (!user.onboarded) {
       if (!inOnboarding) router.replace("/onboarding");
     } else if (inAuth || inOnboarding || seg0 === undefined) {
@@ -44,6 +47,7 @@ function RootNavigator() {
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="welcome" />
       <Stack.Screen name="auth" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="(tabs)" />
