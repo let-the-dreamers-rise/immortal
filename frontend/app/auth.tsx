@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Eye, EyeSlash } from "phosphor-react-native";
+import { CaretLeft, Eye, EyeSlash } from "@/src/components/icons";
 
 import { Button, Txt } from "@/src/components/ui";
 import { useAuth } from "@/src/context/AuthContext";
@@ -24,8 +25,10 @@ const COPY: Record<Mode, { title: string; sub: string; cta: string }> = {
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { register, login, signInWithGoogle, requestPasswordReset, resetPassword, providers } = useAuth();
-  const [mode, setMode] = useState<Mode>("register");
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<Mode>(params.mode === "login" ? "login" : "register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -100,12 +103,22 @@ export default function AuthScreen() {
           locations={[0, 0.55, 1]}
           style={StyleSheet.absoluteFill}
         />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/welcome"))}
+          style={[styles.back, { top: insets.top + spacing.sm }]}
+          hitSlop={10}
+          testID="auth-back"
+        >
+          <CaretLeft size={22} color={colors.onSurfaceInverse} weight="bold" />
+        </Pressable>
         <View style={[styles.heroContent, { paddingTop: insets.top + spacing.xxl }]}>
           <Txt variant="display" color={colors.onSurfaceInverse} style={{ fontSize: 52, lineHeight: 56 }}>
             長生
           </Txt>
           <Txt variant="subtitle" color={colors.onSurfaceInverse} style={{ marginTop: spacing.xs, opacity: 0.9 }}>
-            A path toward a longer, quieter life
+            Five quiet minutes a day, from a tradition that never stopped hoping
           </Txt>
         </View>
       </View>
@@ -189,7 +202,7 @@ export default function AuthScreen() {
               <Txt variant="caption" style={{ marginHorizontal: spacing.md }}>OR</Txt>
               <View style={styles.line} />
             </View>
-            <Button label="Continue with Google" variant="ghost" onPress={google} testID="auth-google-button" />
+            <Button label="Continue with Google" variant="ghost" onPress={google} disabled={busy} testID="auth-google-button" />
           </>
         ) : null}
 
@@ -207,8 +220,16 @@ export default function AuthScreen() {
         </Pressable>
 
         <Txt variant="caption" center style={styles.disclaimer}>
-          This is historical exploration, not medical advice. By continuing you accept our approach to
-          personal, non-clinical practice.
+          This is historical exploration and personal practice, not medical advice. By continuing you confirm
+          you are 18 or older and agree to the{" "}
+          <Txt variant="caption" color={colors.brandPrimary} onPress={() => router.push("/legal/terms")}>
+            Terms
+          </Txt>{" "}
+          and{" "}
+          <Txt variant="caption" color={colors.brandPrimary} onPress={() => router.push("/legal/privacy")}>
+            Privacy Policy
+          </Txt>
+          .
         </Txt>
       </KeyboardAwareScrollView>
     </View>
@@ -237,6 +258,7 @@ function PasswordField({ label, testID, ...props }: FieldProps) {
           {...props}
           testID={testID}
           secureTextEntry={!visible}
+          maxLength={128}
           autoCapitalize="none"
           autoCorrect={false}
           placeholderTextColor={colors.muted}
@@ -259,6 +281,17 @@ function PasswordField({ label, testID, ...props }: FieldProps) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.surface },
   hero: { height: 280 },
+  back: {
+    position: "absolute",
+    left: spacing.lg,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(26,25,24,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
   heroContent: { flex: 1, justifyContent: "flex-end", padding: spacing.xl },
   form: { paddingHorizontal: spacing.xl, paddingTop: spacing.xl },
   input: {

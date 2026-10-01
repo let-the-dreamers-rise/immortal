@@ -1,4 +1,3 @@
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -27,26 +26,34 @@ function RootNavigator() {
   useEffect(() => {
     if (loading) return;
     const seg0 = segments[0];
-    const inAuth = seg0 === "auth";
+    const inAuth = seg0 === "auth" || seg0 === "welcome";
     const inOnboarding = seg0 === "onboarding";
+    // Terms and Privacy are readable by anyone, signed in or not.
+    if (seg0 === "legal") return;
 
     if (!user) {
-      if (!inAuth) router.replace("/auth");
+      // A visitor from a shared link can read a practice and try a session
+      // before deciding to sign up.
+      const open = inAuth || seg0 === "session" || seg0 === "practice";
+      if (!open) router.replace("/welcome");
     } else if (!user.onboarded) {
       if (!inOnboarding) router.replace("/onboarding");
     } else if (inAuth || inOnboarding || seg0 === undefined) {
-      router.replace("/(tabs)");
+      // Today answers "what do I do now"; it is where a returning member lands.
+      router.replace("/(tabs)/today");
     }
   }, [user, loading, segments, router]);
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="welcome" />
       <Stack.Screen name="auth" />
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="stage/[order]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="practice/[id]" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="session/[id]" options={{ animation: "slide_from_bottom", gestureEnabled: false }} />
       <Stack.Screen name="user/[id]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="teaching/[id]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="log/[id]" options={{ animation: "slide_from_right" }} />
@@ -57,6 +64,9 @@ function RootNavigator() {
       <Stack.Screen name="paywall" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
       <Stack.Screen name="lineage/[id]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="lineage/new" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+      <Stack.Screen name="legal/[doc]" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="blocked" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="moderation" options={{ animation: "slide_from_right" }} />
     </Stack>
   );
 }
@@ -77,14 +87,12 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surface }}>
       <SafeAreaProvider>
         <KeyboardProvider>
-          <BottomSheetModalProvider>
             <AuthProvider>
               <View style={{ flex: 1, backgroundColor: colors.surface }}>
                 <StatusBar style="dark" />
                 <RootNavigator />
               </View>
             </AuthProvider>
-          </BottomSheetModalProvider>
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

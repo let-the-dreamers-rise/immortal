@@ -8,16 +8,18 @@ lightweight community-following layer.
 
 import asyncio
 import base64
+import hashlib
+import json
 import logging
 import os
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from typing import List, Optional
+from zoneinfo import ZoneInfo
 
 import bcrypt
-import httpx
 import requests
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Request, Response
@@ -29,6 +31,8 @@ from starlette.middleware.cors import CORSMiddleware
 import auth_extra
 import billing
 import lineages
+import safety
+from localtime import client_tz, local_date, local_now
 from seed_lineages import ARCHIVE_USER, FOUNDING_LINEAGES
 from today import build_today, growth_for
 from seed_data import (
@@ -153,6 +157,7 @@ def public_user(u: dict) -> dict:
         "has_password": bool(u.get("hashed_password")),
         "is_premium": billing.user_is_premium(u),
         "premium_expires_at": u.get("premium_expires_at"),
+        "is_moderator": safety.is_admin(u),
     }
 
 
@@ -173,35 +178,41 @@ def community_user(u: dict) -> dict:
 # ---------------------------------------------------------------------------
 class RegisterIn(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    # bcrypt reads only the first 72 bytes, and newer releases reject longer
+    # input outright, so the cap keeps a long passphrase from becoming a 500.
+    password: str = Field(min_length=8, max_length=128)
     display_name: str = Field(min_length=2, max_length=40)
 
 
 class LoginIn(BaseModel):
     email: EmailStr
-    password: str
-
-
-class SessionIn(BaseModel):
-    session_id: str
+    password: str = Field(max_length=128)
 
 
 class OnboardingIn(BaseModel):
-    intention: str
+    intention: str = Field(default="", max_length=500)
     path_choice: str  # dao | ayurveda | both
 
 
 class ProfileIn(BaseModel):
-    display_name: Optional[str] = None
-    bio: Optional[str] = None
+    display_name: Optional[str] = Field(default=None, max_length=40)
+    bio: Optional[str] = Field(default=None, max_length=280)
 
 
 def client_ip(request: Request) -> str:
-    """Caller IP, honouring the proxy header the app is deployed behind."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Caller IP as the trusted proxy saw it.
+
+    uvicorn runs with --proxy-headers, so request.client already holds the
+    address Cloud Run's front end appended. The left end of X-Forwarded-For is
+    whatever the caller chose to send, so reading it let anyone dodge the
+    per-IP throttle by changing one header.
+    """
     return request.client.host if request.client else "unknown"
+
+
+async def auth_attempts_recent(key: str) -> int:
+    cutoff = now_utc() - timedelta(seconds=AUTH_WINDOW_SECONDS)
+    return await db.auth_attempts.count_documents({"key": key, "at": {"$gte": cutoff}})
 
 
 async def enforce_auth_rate_limit(key: str) -> None:
@@ -220,11 +231,17 @@ async def enforce_auth_rate_limit(key: str) -> None:
         )
 
 
+def token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 async def create_session(user_id: str) -> str:
+    # Only a hash is stored, so a copy of the database (a backup, an export, a
+    # leaked console screenshot) cannot be replayed as anyone's login.
     token = secrets.token_urlsafe(32)
     await db.user_sessions.insert_one(
         {
-            "session_token": token,
+            "session_token": token_hash(token),
             "user_id": user_id,
             "created_at": now_utc(),
             "expires_at": now_utc() + timedelta(days=SESSION_TTL_DAYS),
@@ -237,7 +254,15 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
     token = authorization.split(" ", 1)[1].strip()
-    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not token or len(token) > 200:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    session = await db.user_sessions.find_one({"session_token": token_hash(token)}, {"_id": 0})
+    if not session:
+        # Sessions created before tokens were hashed: accept once, then store
+        # the hash in place of the raw token.
+        session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+        if session:
+            await db.user_sessions.update_one({"session_token": token}, {"$set": {"session_token": token_hash(token)}})
     if not session:
         raise HTTPException(status_code=401, detail="Invalid session")
     exp = session["expires_at"]
@@ -248,6 +273,8 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
     user = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.get("suspended"):
+        raise HTTPException(status_code=401, detail="This account has been suspended.")
     return user
 
 
@@ -280,29 +307,19 @@ async def register(body: RegisterIn, request: Request):
 
 @api.post("/auth/login")
 async def login(body: LoginIn, request: Request):
-    await enforce_auth_rate_limit(f"login:{body.email.lower()}")
+    # Every attempt counts against the IP. Only failures count against the
+    # email, so a member who signs in on three devices is never locked out,
+    # while guessing one account's password still stops after a few tries.
+    email_key = f"login:{body.email.lower()}"
     await enforce_auth_rate_limit(f"login-ip:{client_ip(request)}")
+    if await auth_attempts_recent(email_key) >= AUTH_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Too many attempts. Please wait a few minutes and try again.")
     user = await db.users.find_one({"email": body.email.lower()})
     if not user or not user.get("hashed_password") or not verify_password(body.password, user["hashed_password"]):
+        await db.auth_attempts.insert_one({"key": email_key, "at": now_utc()})
         raise HTTPException(status_code=401, detail="Incorrect email or password")
-    token = await create_session(user["user_id"])
-    return {"session_token": token, "user": public_user(user)}
-
-
-@api.post("/auth/session")
-async def google_session(body: SessionIn):
-    async with httpx.AsyncClient(timeout=30) as hc:
-        resp = await hc.get(
-            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-            headers={"X-Session-ID": body.session_id},
-        )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
-    data = resp.json()
-    email = (data.get("email") or "").lower()
-    if not email:
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
-    user = await upsert_oauth_user(email, data.get("name"), data.get("picture"), "google")
+    if user.get("suspended"):
+        raise HTTPException(status_code=403, detail="This account has been suspended.")
     token = await create_session(user["user_id"])
     return {"session_token": token, "user": public_user(user)}
 
@@ -311,9 +328,21 @@ async def upsert_oauth_user(email: str, name: Optional[str], picture: Optional[s
     """Find the account for a verified OAuth email, creating it on first sign-in."""
     existing = await db.users.find_one({"email": email}, {"_id": 0})
     if existing:
+        updates: dict = {}
         if not existing.get("picture") and picture:
-            await db.users.update_one({"user_id": existing["user_id"]}, {"$set": {"picture": picture}})
-            existing = {**existing, "picture": picture}
+            updates["picture"] = picture
+        if not existing.get("email_verified"):
+            # Email sign-up never proves the address, so someone could have
+            # registered this email first and kept a session open, waiting
+            # for the real owner to arrive by Google. Google has now proved
+            # ownership: cut every earlier session and the unproven password.
+            updates["email_verified"] = True
+            if existing.get("hashed_password"):
+                updates["hashed_password"] = None
+            await db.user_sessions.delete_many({"user_id": existing["user_id"]})
+        if updates:
+            await db.users.update_one({"user_id": existing["user_id"]}, {"$set": updates})
+            existing = {**existing, **updates}
         return existing
     user = {
         "user_id": new_user_id(),
@@ -321,6 +350,7 @@ async def upsert_oauth_user(email: str, name: Optional[str], picture: Optional[s
         "display_name": (name or email.split("@")[0]).strip()[:40],
         "hashed_password": None,
         "auth_provider": provider,
+        "email_verified": True,
         "picture": picture,
         "bio": None,
         "intention": None,
@@ -341,7 +371,7 @@ async def me(user: dict = Depends(get_current_user)):
 async def logout(authorization: Optional[str] = Header(default=None)):
     if authorization and authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
-        await db.user_sessions.delete_one({"session_token": token})
+        await db.user_sessions.delete_many({"session_token": {"$in": [token, token_hash(token)]}})
     return {"ok": True}
 
 
@@ -382,6 +412,7 @@ async def delete_account(body: DeleteAccountIn, user: dict = Depends(get_current
     # Both directions: their follows, and other people's follows of them.
     await db.follows.delete_many({"$or": [{"follower_id": uid}, {"following_id": uid}]})
     await lineages.erase_user(db, uid)
+    await safety.erase_user(db, uid)
     await db.password_resets.delete_many({"email": user.get("email")})
     await db.users.delete_one({"user_id": uid})
     # Sessions last, so this request itself stays authenticated to the end.
@@ -393,6 +424,7 @@ async def delete_account(body: DeleteAccountIn, user: dict = Depends(get_current
 
 @api.post("/auth/onboarding")
 async def onboarding(body: OnboardingIn, user: dict = Depends(get_current_user)):
+    # Older app builds still offer "both"; everyone walks the Dao path now.
     if body.path_choice not in ("dao", "ayurveda", "both"):
         raise HTTPException(status_code=400, detail="Invalid path choice")
     await db.users.update_one(
@@ -479,8 +511,14 @@ async def serve_illustration(practice_id: str):
 async def get_progress_doc(user_id: str) -> dict:
     doc = await db.path_progress.find_one({"user_id": user_id}, {"_id": 0})
     if not doc:
-        doc = {"user_id": user_id, "stages": {}, "updated_at": now_utc()}
-        await db.path_progress.insert_one(dict(doc))
+        # Upsert, not insert: two screens opening at once used to create two
+        # progress documents, and check-ins then landed on either one.
+        await db.path_progress.update_one(
+            {"user_id": user_id},
+            {"$setOnInsert": {"stages": {}, "updated_at": now_utc()}},
+            upsert=True,
+        )
+        doc = await db.path_progress.find_one({"user_id": user_id}, {"_id": 0})
     return doc
 
 
@@ -510,18 +548,19 @@ def stage_status(order: int, progress: dict) -> dict:
 # Today
 # ---------------------------------------------------------------------------
 @api.get("/today")
-async def today(user: dict = Depends(get_current_user)):
+async def today(user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)):
     """One practice for right now, plus the pine.
 
     Answers "what do I do today" so the practitioner does not have to. The
     growth model is accumulated days rather than a streak, so a missed day
     costs nothing.
     """
-    now = now_utc()
+    # The practitioner's clock: the phase, the suggestion and "practised
+    # today" all follow their day, not the server's.
+    now = local_now(tz)
     uid = user["user_id"]
 
-    logs = await db.logs.find({"user_id": uid, "deleted_at": None}, {"_id": 0, "date": 1}).to_list(2000)
-    dates = {l["date"] for l in logs}
+    dates = await practice_dates(uid)
     total_days = len(dates)
     logged_today = now.strftime("%Y-%m-%d") in dates
 
@@ -664,30 +703,67 @@ async def complete_stage(order: int, body: UnlockIn, user: dict = Depends(get_cu
 # ---------------------------------------------------------------------------
 # Journal / logs
 # ---------------------------------------------------------------------------
+MOODS = ("still", "open", "tired", "restless", "light")
+
+
 class LogIn(BaseModel):
-    body: Optional[str] = ""
+    body: Optional[str] = Field(default="", max_length=5000)
     mood: Optional[str] = None  # still | open | tired | restless | light
     nothing_happened: bool = False
-    practice_ids: List[str] = []
+    practice_ids: List[str] = Field(default_factory=list, max_length=10)
     stage_order: Optional[int] = None
     visibility: str = "private"  # private | public
+    # Seconds spent in a guided session, when the log comes from one.
+    duration_seconds: Optional[int] = Field(default=None, ge=0, le=6 * 3600)
 
 
-async def bump_stage_checkin(user_id: str, stage_order: Optional[int]):
+async def practice_dates(user_id: str) -> set:
+    logs = await db.logs.find({"user_id": user_id, "deleted_at": None}, {"_id": 0, "date": 1}).to_list(5000)
+    return {l["date"] for l in logs}
+
+
+async def refresh_practice_summary(user_id: str) -> None:
+    """Keep days practised and the last practice date on the user document.
+
+    The community list sorts and labels by these. Reading them from one
+    document per person replaces a full scan of every listed member's logs on
+    every visit, which did not survive more than a few hundred members.
+    """
+    dates = await practice_dates(user_id)
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"practice_days": len(dates), "last_practised": max(dates) if dates else None}},
+    )
+
+
+async def bump_stage_checkin(user_id: str, stage_order: Optional[int], day: str):
+    """One check-in per stage per day.
+
+    Counting every save let anyone clear a stage's minimum by saving three
+    entries in a minute, which made the gate meaningless.
+    """
     if stage_order is None:
         return
     progress = await get_progress_doc(user_id)
     st = progress.get("stages", {}).get(str(stage_order), {})
     if st.get("started_at"):
         await db.path_progress.update_one(
-            {"user_id": user_id}, {"$inc": {f"stages.{stage_order}.checkins": 1}, "$set": {"updated_at": now_utc()}}
+            {"user_id": user_id, f"stages.{stage_order}.last_checkin_date": {"$ne": day}},
+            {
+                "$inc": {f"stages.{stage_order}.checkins": 1},
+                "$set": {f"stages.{stage_order}.last_checkin_date": day, "updated_at": now_utc()},
+            },
         )
 
 
 @api.post("/logs")
-async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
+async def create_log(body: LogIn, user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)):
     if body.visibility not in ("private", "public"):
         raise HTTPException(status_code=400, detail="Invalid visibility")
+    if body.mood is not None and body.mood not in MOODS:
+        raise HTTPException(status_code=400, detail="Invalid mood")
+    if body.visibility == "public" and not (body.body or "").strip():
+        raise HTTPException(status_code=400, detail="Write something before sharing with the community.")
     now = now_utc()
     log = {
         "log_id": "log_" + uuid.uuid4().hex[:12],
@@ -695,17 +771,24 @@ async def create_log(body: LogIn, user: dict = Depends(get_current_user)):
         "body": (body.body or "").strip(),
         "mood": body.mood,
         "nothing_happened": body.nothing_happened,
-        "practice_ids": body.practice_ids,
+        "practice_ids": [p[:80] for p in body.practice_ids],
         "stage_order": body.stage_order,
         "visibility": body.visibility,
+        "duration_seconds": body.duration_seconds,
         "created_at": now,
-        "date": now.strftime("%Y-%m-%d"),
+        "date": local_date(now, tz),
         "deleted_at": None,
     }
     await db.logs.insert_one(dict(log))
-    await bump_stage_checkin(user["user_id"], body.stage_order)
+    # A stage counts a day whenever one of its practices is done, from
+    # wherever it was started (Today, the library, the stage page).
+    stage_orders = {body.stage_order} if body.stage_order is not None else set()
+    stage_orders |= {st["order"] for st in STAGES if set(st["practices"]) & set(log["practice_ids"])}
+    for order in stage_orders:
+        await bump_stage_checkin(user["user_id"], order, log["date"])
+    await refresh_practice_summary(user["user_id"])
     log.pop("deleted_at", None)
-    return {"log": log}
+    return {"log": log, "growth": growth_for(len(await practice_dates(user["user_id"])))}
 
 
 async def enrich_logs(docs: List[dict]) -> List[dict]:
@@ -739,8 +822,12 @@ async def my_logs(user: dict = Depends(get_current_user)):
 
 @api.get("/logs/feed")
 async def feed(user: dict = Depends(get_current_user)):
+    hidden = await safety.hidden_user_ids(db, user["user_id"])
     docs = (
-        await db.logs.find({"visibility": "public", "deleted_at": None}, {"_id": 0})
+        await db.logs.find(
+            {"visibility": "public", "deleted_at": None, "hidden": {"$ne": True}, "user_id": {"$nin": list(hidden)}},
+            {"_id": 0},
+        )
         .sort("created_at", -1)
         .to_list(100)
     )
@@ -755,6 +842,7 @@ async def delete_log(log_id: str, user: dict = Depends(get_current_user)):
     )
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Log not found")
+    await refresh_practice_summary(user["user_id"])
     return {"ok": True}
 
 
@@ -778,8 +866,11 @@ async def visible_log(log_id: str, user: dict) -> dict:
     log = await db.logs.find_one({"log_id": log_id, "deleted_at": None}, {"_id": 0})
     if not log:
         raise HTTPException(status_code=404, detail="Reflection not found")
-    if log["visibility"] != "public" and log["user_id"] != user["user_id"]:
-        raise HTTPException(status_code=403, detail="This reflection is private")
+    if log["user_id"] != user["user_id"]:
+        if log["visibility"] != "public":
+            raise HTTPException(status_code=403, detail="This reflection is private")
+        if log.get("hidden") or log["user_id"] in await safety.hidden_user_ids(db, user["user_id"]):
+            raise HTTPException(status_code=404, detail="Reflection not found")
     return log
 
 
@@ -787,8 +878,14 @@ async def visible_log(log_id: str, user: dict) -> dict:
 async def get_log(log_id: str, user: dict = Depends(get_current_user)):
     log = await visible_log(log_id, user)
     (log,) = await enrich_logs([log])
+    hidden = await safety.hidden_user_ids(db, user["user_id"])
     comments = (
-        await db.comments.find({"log_id": log_id, "deleted_at": None}, {"_id": 0}).sort("created_at", 1).to_list(300)
+        await db.comments.find(
+            {"log_id": log_id, "deleted_at": None, "hidden": {"$ne": True}, "user_id": {"$nin": list(hidden)}},
+            {"_id": 0},
+        )
+        .sort("created_at", 1)
+        .to_list(300)
     )
     comments = await enrich_comments(comments)
     return {"log": log, "comments": comments}
@@ -862,10 +959,32 @@ class MeetupIn(BaseModel):
     tradition: str = "mixed"  # dao | ayurveda | mixed
     location_name: str = Field(min_length=2, max_length=140)
     city: str = Field(min_length=1, max_length=80)
-    starts_at: str  # ISO datetime
-    capacity: Optional[int] = None
-    lat: Optional[float] = None
-    lng: Optional[float] = None
+    starts_at: str = Field(max_length=40)  # ISO datetime
+    capacity: Optional[int] = Field(default=None, ge=2, le=500)
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+
+
+def normalise_start(raw: str) -> str:
+    """A meetup start as one canonical UTC ISO string, or a 400.
+
+    Listing compares these as strings, so "2026-10-01T10:00:00.000Z" and
+    "2026-10-01T10:00:00+00:00" have to become the same shape on the way in,
+    and a start in the past (or years out) is refused.
+    """
+    try:
+        dt = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="That start time is not valid.")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    dt = dt.astimezone(timezone.utc)
+    now = now_utc()
+    if dt < now - timedelta(minutes=5):
+        raise HTTPException(status_code=400, detail="Pick a time that has not passed yet.")
+    if dt > now + timedelta(days=366):
+        raise HTTPException(status_code=400, detail="Circles can be planned up to a year ahead.")
+    return dt.isoformat()
 
 
 class RsvpIn(BaseModel):
@@ -884,10 +1003,12 @@ async def create_meetup(body: MeetupIn, user: dict = Depends(get_current_user)):
         "tradition": body.tradition,
         "location_name": body.location_name.strip(),
         "city": body.city.strip(),
-        "starts_at": body.starts_at,
+        "starts_at": normalise_start(body.starts_at),
         "capacity": body.capacity,
-        "lat": body.lat,
-        "lng": body.lng,
+        # About a kilometre: enough to sort circles by distance, not enough to
+        # pinpoint the host's home if they created it from there.
+        "lat": round(body.lat, 2) if body.lat is not None else None,
+        "lng": round(body.lng, 2) if body.lng is not None else None,
         "created_at": now_utc(),
         "deleted_at": None,
     }
@@ -902,28 +1023,59 @@ async def create_meetup(body: MeetupIn, user: dict = Depends(get_current_user)):
     return {"meetup": m}
 
 
-async def meetup_card(m: dict, user_id: str, lat=None, lng=None) -> dict:
-    host = await db.users.find_one({"user_id": m["host_id"]}, {"_id": 0})
-    attendees = await db.rsvps.count_documents({"meetup_id": m["meetup_id"]})
-    is_rsvped = bool(await db.rsvps.find_one({"meetup_id": m["meetup_id"], "user_id": user_id}))
-    distance = None
-    if lat is not None and lng is not None and m.get("lat") is not None and m.get("lng") is not None:
-        distance = round(haversine_km(lat, lng, m["lat"], m["lng"]), 1)
-    return {
-        **{k: m[k] for k in ("meetup_id", "host_id", "title", "description", "tradition", "location_name", "city", "starts_at", "capacity", "lat", "lng")},
-        "host": {"user_id": m["host_id"], "display_name": (host or {}).get("display_name"), "picture": (host or {}).get("picture")},
-        "attendees": attendees,
-        "is_rsvped": is_rsvped,
-        "is_host": m["host_id"] == user_id,
-        "distance_km": distance,
+MEETUP_FIELDS = ("meetup_id", "host_id", "title", "description", "tradition", "location_name", "city", "starts_at", "capacity", "lat", "lng")
+
+
+async def meetup_cards(docs: List[dict], user_id: str, lat=None, lng=None) -> List[dict]:
+    """Cards for many meetups in four queries, whatever the count."""
+    ids = [m["meetup_id"] for m in docs]
+    hosts = {
+        u["user_id"]: u
+        async for u in db.users.find({"user_id": {"$in": list({m["host_id"] for m in docs})}}, {"_id": 0})
     }
+    counts: dict = {}
+    mine: set = set()
+    async for r in db.rsvps.find({"meetup_id": {"$in": ids}}, {"_id": 0, "meetup_id": 1, "user_id": 1}):
+        counts[r["meetup_id"]] = counts.get(r["meetup_id"], 0) + 1
+        if r["user_id"] == user_id:
+            mine.add(r["meetup_id"])
+    out = []
+    for m in docs:
+        host = hosts.get(m["host_id"]) or {}
+        distance = None
+        if lat is not None and lng is not None and m.get("lat") is not None and m.get("lng") is not None:
+            distance = round(haversine_km(lat, lng, m["lat"], m["lng"]), 1)
+        out.append(
+            {
+                **{k: m.get(k) for k in MEETUP_FIELDS},
+                "host": {"user_id": m["host_id"], "display_name": host.get("display_name"), "picture": host.get("picture")},
+                "attendees": counts.get(m["meetup_id"], 0),
+                "is_rsvped": m["meetup_id"] in mine,
+                "is_host": m["host_id"] == user_id,
+                "distance_km": distance,
+            }
+        )
+    return out
+
+
+async def meetup_card(m: dict, user_id: str, lat=None, lng=None) -> dict:
+    (card,) = await meetup_cards([m], user_id, lat, lng)
+    return card
 
 
 @api.get("/meetups")
 async def list_meetups(user: dict = Depends(get_current_user), lat: Optional[float] = None, lng: Optional[float] = None):
-    now_iso = now_utc().isoformat()
-    docs = await db.meetups.find({"deleted_at": None, "starts_at": {"$gte": now_iso}}, {"_id": 0}).to_list(200)
-    cards = [await meetup_card(m, user["user_id"], lat, lng) for m in docs]
+    now_iso = (now_utc() - timedelta(hours=3)).isoformat()
+    hidden = await safety.hidden_user_ids(db, user["user_id"])
+    docs = (
+        await db.meetups.find(
+            {"deleted_at": None, "hidden": {"$ne": True}, "starts_at": {"$gte": now_iso}, "host_id": {"$nin": list(hidden)}},
+            {"_id": 0},
+        )
+        .sort("starts_at", 1)
+        .to_list(200)
+    )
+    cards = await meetup_cards(docs, user["user_id"], lat, lng)
     if lat is not None and lng is not None:
         cards.sort(key=lambda c: (c["distance_km"] is None, c["distance_km"] if c["distance_km"] is not None else 0, c["starts_at"]))
     else:
@@ -934,7 +1086,7 @@ async def list_meetups(user: dict = Depends(get_current_user), lat: Optional[flo
 @api.get("/meetups/{meetup_id}")
 async def get_meetup(meetup_id: str, user: dict = Depends(get_current_user)):
     m = await db.meetups.find_one({"meetup_id": meetup_id, "deleted_at": None}, {"_id": 0})
-    if not m:
+    if not m or (m["host_id"] != user["user_id"] and (m.get("hidden") or m["host_id"] in await safety.hidden_user_ids(db, user["user_id"]))):
         raise HTTPException(status_code=404, detail="Meetup not found")
     card = await meetup_card(m, user["user_id"])
     rsvps = await db.rsvps.find({"meetup_id": meetup_id}, {"_id": 0}).to_list(300)
@@ -989,7 +1141,7 @@ async def delete_meetup(meetup_id: str, user: dict = Depends(get_current_user)):
 MILESTONES = [7, 30, 90, 365]
 
 
-def compute_streaks(dates: List[str]) -> dict:
+def compute_streaks(dates: List[str], today=None) -> dict:
     if not dates:
         return {"current": 0, "longest": 0, "total_days": 0}
     unique = sorted(set(dates))
@@ -1002,7 +1154,7 @@ def compute_streaks(dates: List[str]) -> dict:
             longest = max(longest, run)
         else:
             run = 1
-    today = now_utc().date()
+    today = today or now_utc().date()
     current = 0
     if dvals[-1] in (today, today - timedelta(days=1)):
         current = 1
@@ -1014,10 +1166,10 @@ def compute_streaks(dates: List[str]) -> dict:
     return {"current": current, "longest": longest, "total_days": len(unique)}
 
 
-async def build_stats(user_id: str) -> dict:
-    logs = await db.logs.find({"user_id": user_id, "deleted_at": None}, {"_id": 0, "date": 1}).to_list(2000)
+async def build_stats(user_id: str, tz: tzinfo = timezone.utc) -> dict:
+    logs = await db.logs.find({"user_id": user_id, "deleted_at": None}, {"_id": 0, "date": 1}).to_list(5000)
     dates = [l["date"] for l in logs]
-    streaks = compute_streaks(dates)
+    streaks = compute_streaks(dates, local_now(tz).date())
     total_logs = len(logs)
     achieved = [m for m in MILESTONES if streaks["longest"] >= m or streaks["total_days"] >= m]
     is_elder = streaks["longest"] >= 90 or streaks["total_days"] >= 108
@@ -1035,8 +1187,8 @@ async def build_stats(user_id: str) -> dict:
 
 
 @api.get("/stats/me")
-async def my_stats(user: dict = Depends(get_current_user)):
-    stats = await build_stats(user["user_id"])
+async def my_stats(user: dict = Depends(get_current_user), tz: tzinfo = Depends(client_tz)):
+    stats = await build_stats(user["user_id"], tz)
     progress = await get_progress_doc(user["user_id"])
     completed = sum(1 for v in progress.get("stages", {}).values() if v.get("completed"))
     stats["stages_completed"] = completed
@@ -1049,28 +1201,37 @@ async def my_stats(user: dict = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 @api.get("/community/practitioners")
 async def practitioners(user: dict = Depends(get_current_user)):
+    hidden = await safety.hidden_user_ids(db, user["user_id"])
+    # Most recently practised first. Recency is a fact about who is around;
+    # a streak ranking would be a claim about who is doing better. Read from
+    # the summary on each user document, so this is one query at any size.
     users = (
-        await db.users.find({"onboarded": True, "user_id": {"$ne": user["user_id"]}}, {"_id": 0})
+        await db.users.find(
+            {
+                "onboarded": True,
+                "user_id": {"$nin": list(hidden | {user["user_id"], ARCHIVE_USER["user_id"]})},
+                "suspended": {"$ne": True},
+            },
+            {"_id": 0},
+        )
+        .sort([("last_practised", -1), ("created_at", -1)])
         .limit(50)
         .to_list(50)
     )
-    following = {f["following_id"] async for f in db.follows.find({"follower_id": user["user_id"]}, {"_id": 0})}
-    out = []
-    for u in users:
-        stats = await build_stats(u["user_id"])
-        last = await db.logs.find_one(
-            {"user_id": u["user_id"], "deleted_at": None}, {"_id": 0, "date": 1}, sort=[("date", -1)]
-        )
-        out.append(
-            {
-                **community_user(u),
-                "growth": stats["growth"],
-                "last_practised": (last or {}).get("date"),
-                "is_following": u["user_id"] in following,
-            }
-        )
-    # Most recently practised first. Recency is a fact about who is around;
-    # a streak ranking would be a claim about who is doing better.
+    ids = [u["user_id"] for u in users]
+    following = {
+        f["following_id"]
+        async for f in db.follows.find({"follower_id": user["user_id"], "following_id": {"$in": ids}}, {"_id": 0})
+    }
+    out = [
+        {
+            **community_user(u),
+            "growth": growth_for(u.get("practice_days") or 0),
+            "last_practised": u.get("last_practised"),
+            "is_following": u["user_id"] in following,
+        }
+        for u in users
+    ]
     out.sort(key=lambda x: (x["last_practised"] or "", x["display_name"] or ""), reverse=True)
     return {"practitioners": out}
 
@@ -1078,20 +1239,29 @@ async def practitioners(user: dict = Depends(get_current_user)):
 @api.get("/community/users/{user_id}")
 async def user_profile(user_id: str, user: dict = Depends(get_current_user)):
     u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    if not u:
+    if not u or (user_id != user["user_id"] and user_id in await safety.hidden_user_ids(db, user["user_id"])):
         raise HTTPException(status_code=404, detail="User not found")
     stats = await build_stats(user_id)
     followers = await db.follows.count_documents({"following_id": user_id})
     following = await db.follows.count_documents({"follower_id": user_id})
     is_following = bool(await db.follows.find_one({"follower_id": user["user_id"], "following_id": user_id}))
     logs = (
-        await db.logs.find({"user_id": user_id, "visibility": "public", "deleted_at": None}, {"_id": 0})
+        await db.logs.find(
+            {"user_id": user_id, "visibility": "public", "deleted_at": None, "hidden": {"$ne": True}}, {"_id": 0}
+        )
         .sort("created_at", -1)
         .to_list(50)
     )
     logs = await enrich_logs(logs)
     return {
-        "profile": {**community_user(u), **stats, "followers": followers, "following": following, "is_following": is_following},
+        "profile": {
+            **community_user(u),
+            **stats,
+            "followers": followers,
+            "following": following,
+            "is_following": is_following,
+            "is_blocked": user_id in await safety.blocked_by_me(db, user["user_id"]),
+        },
         "logs": logs,
     }
 
@@ -1100,7 +1270,7 @@ async def user_profile(user_id: str, user: dict = Depends(get_current_user)):
 async def follow(user_id: str, user: dict = Depends(get_current_user)):
     if user_id == user["user_id"]:
         raise HTTPException(status_code=400, detail="You cannot follow yourself")
-    if not await db.users.find_one({"user_id": user_id}):
+    if not await db.users.find_one({"user_id": user_id}) or user_id in await safety.hidden_user_ids(db, user["user_id"]):
         raise HTTPException(status_code=404, detail="User not found")
     await db.follows.update_one(
         {"follower_id": user["user_id"], "following_id": user_id},
@@ -1140,7 +1310,8 @@ api.include_router(
     )
 )
 api.include_router(billing.build_router(db, get_current_user, public_user))
-api.include_router(lineages.build_router(db, get_current_user))
+api.include_router(lineages.build_router(db, get_current_user, hidden_user_ids=lambda uid: safety.hidden_user_ids(db, uid)))
+api.include_router(safety.build_router(db, get_current_user))
 app.include_router(api)
 
 # Origins come from CORS_ORIGINS (comma-separated) in deployed environments.
@@ -1159,10 +1330,31 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Seeding + illustration generation
 # ---------------------------------------------------------------------------
+# Immortal is Chinese Dao practice only (Ash, 2026-10-01). The Ayurveda
+# entries stay in the seed files so old logs that name them still open, but
+# they are retired: never listed, never suggested.
+LIVE_TRADITIONS = ("dao",)
+
+
+def practice_status(p: dict) -> str:
+    return "approved" if p.get("tradition") in LIVE_TRADITIONS else "retired"
+
+
+def seed_fingerprint() -> str:
+    blob = json.dumps([PRACTICES, FOUNDING_LINEAGES, ARCHIVE_USER, LIVE_TRADITIONS], sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
 async def seed_content():
+    # Cloud Run starts a fresh instance whenever traffic rises, and each one
+    # used to rewrite every practice and lineage. Skip when nothing changed.
+    fingerprint = seed_fingerprint()
+    meta = await db.meta.find_one({"_id": "seed"})
+    if meta and meta.get("fingerprint") == fingerprint:
+        return
     for i, p in enumerate(PRACTICES):
         existing = await db.practices.find_one({"practice_id": p["practice_id"]}, {"_id": 0})
-        doc = {**p, "order": i, "status": "approved"}
+        doc = {**p, "order": i, "status": practice_status(p)}
         if existing:
             doc["illustration_path"] = existing.get("illustration_path")
             await db.practices.update_one({"practice_id": p["practice_id"]}, {"$set": doc})
@@ -1186,6 +1378,16 @@ async def seed_content():
             upsert=True,
         )
     logger.info("Seeded %d founding lineages", len(FOUNDING_LINEAGES))
+    await db.meta.update_one({"_id": "seed"}, {"$set": {"fingerprint": fingerprint, "at": now_utc()}}, upsert=True)
+
+
+async def backfill_practice_summaries():
+    """Members who logged before the summary fields existed get them once."""
+    try:
+        async for u in db.users.find({"practice_days": {"$exists": False}}, {"_id": 0, "user_id": 1}):
+            await refresh_practice_summary(u["user_id"])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("practice summary backfill stopped: %s", e)
 
 
 async def generate_illustrations():
@@ -1231,6 +1433,13 @@ INDEXES = [
     ("user_sessions", "session_token", {"unique": True}),
     ("user_sessions", "expires_at", {"expireAfterSeconds": 0}),
     ("logs", [("user_id", 1), ("created_at", -1)], {}),
+    ("logs", [("visibility", 1), ("created_at", -1)], {}),
+    ("users", [("last_practised", -1)], {}),
+    ("path_progress", "user_id", {"unique": True}),
+    ("blocks", [("blocker_id", 1), ("blocked_id", 1)], {"unique": True}),
+    ("blocks", "blocked_id", {}),
+    ("reports", [("kind", 1), ("target_id", 1), ("status", 1)], {}),
+    ("reports", [("status", 1), ("created_at", -1)], {}),
     ("follows", [("follower_id", 1), ("following_id", 1)], {"unique": True}),
     ("comments", [("log_id", 1), ("created_at", 1)], {}),
     ("rsvps", [("meetup_id", 1), ("user_id", 1)], {"unique": True}),
@@ -1263,6 +1472,7 @@ async def on_startup():
     # longer than a Cloud Run startup probe waits, and queries work without it.
     asyncio.create_task(ensure_indexes())
     await seed_content()
+    asyncio.create_task(backfill_practice_summaries())
     init_storage()
     asyncio.create_task(generate_illustrations())
 

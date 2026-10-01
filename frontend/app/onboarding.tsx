@@ -1,39 +1,34 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { YinYang, Sparkle } from "phosphor-react-native";
 
 import { Button, Txt } from "@/src/components/ui";
 import { useAuth } from "@/src/context/AuthContext";
-import { apiFetch } from "@/src/api/client";
+import { apiFetch, errorMessage } from "@/src/api/client";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
-// The guided curriculum is Daoist, and only Daoist. Offering a standalone
-// "Ayurveda" path promised a staged journey that does not exist — the stage
-// list is Dao end to end. Both options below therefore walk the same path and
-// differ only in what sits in the library beside it.
-const PATHS = [
-  { key: "dao", title: "The Dao Path", desc: "The guided journey — movement, breath and stillness, staged over two years.", Icon: YinYang },
-  { key: "both", title: "The Dao Path, with Ayurveda", desc: "The same guided journey, with Ayurvedic practices in your library alongside it.", Icon: Sparkle },
-];
-
+// Immortal is Chinese Dao practice and nothing else, so there is no path to
+// choose: one question, then straight to the first practice.
 export default function Onboarding() {
   const insets = useSafeAreaInsets();
   const { setUser } = useAuth();
   const [intention, setIntention] = useState("");
-  const [choice, setChoice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
-    if (!choice) return;
+    if (busy) return;
     setBusy(true);
+    setError(null);
     try {
       const res = await apiFetch<{ user: any }>("/auth/onboarding", {
         method: "POST",
-        body: { intention: intention.trim() || "To live well, for longer.", path_choice: choice },
+        body: { intention: intention.trim() || "To practise a little, every day.", path_choice: "dao" },
       });
       setUser(res.user);
+    } catch (e) {
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -60,46 +55,26 @@ export default function Onboarding() {
           placeholder="I want to move through my later years with clarity and calm…"
           placeholderTextColor={colors.muted}
           multiline
+          maxLength={500}
           style={styles.intentionInput}
           testID="onboarding-intention-input"
         />
 
-        <Txt variant="title" style={{ marginTop: spacing.xxl, marginBottom: spacing.xs }}>
-          Choose your path
+        <Txt variant="bodySm" style={{ marginTop: spacing.xl }}>
+          Next you get one short Daoist practice for right now. Most take a few minutes and need no
+          experience, no mat and no special clothes.
         </Txt>
-        <Txt variant="caption" style={{ marginBottom: spacing.md }}>
-          The guided journey is Daoist. Ayurvedic practices sit in the library beside it, not as a
-          separate path.
-        </Txt>
-        {PATHS.map((p) => {
-          const active = choice === p.key;
-          const Icon = p.Icon;
-          return (
-            <Pressable
-              key={p.key}
-              testID={`onboarding-path-${p.key}`}
-              onPress={() => setChoice(p.key)}
-              style={[styles.pathCard, active && styles.pathCardActive]}
-            >
-              <View style={[styles.pathIcon, active && { backgroundColor: colors.brandPrimary }]}>
-                <Icon size={24} color={active ? colors.onBrandPrimary : colors.brandPrimary} weight="regular" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Txt variant="label" color={active ? colors.onSurface : colors.onSurface}>
-                  {p.title}
-                </Txt>
-                <Txt variant="bodySm" style={{ marginTop: 2 }}>{p.desc}</Txt>
-              </View>
-            </Pressable>
-          );
-        })}
       </KeyboardAwareScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+        {error ? (
+          <Txt variant="bodySm" color={colors.error} style={{ marginBottom: spacing.sm }} testID="onboarding-error">
+            {error}
+          </Txt>
+        ) : null}
         <Button
           label="Enter the path"
           onPress={submit}
-          disabled={!choice}
           loading={busy}
           testID="onboarding-submit-button"
         />
@@ -122,26 +97,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     color: colors.onSurface,
-  },
-  pathCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  pathCardActive: { borderColor: colors.brandPrimary, backgroundColor: colors.surfaceTertiary },
-  pathIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.md,
-    backgroundColor: colors.brandTertiary,
-    alignItems: "center",
-    justifyContent: "center",
   },
   footer: {
     position: "absolute",

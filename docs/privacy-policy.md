@@ -4,9 +4,9 @@
 
 This policy explains what Immortal collects, why, who else can see it, and how to get it back or get rid of it. It describes what the app actually does, not what apps in general do.
 
-In this policy, "we" and "us" mean **[LEGAL ENTITY NAME]**, **[REGISTERED ADDRESS]**, the data fiduciary responsible for Immortal. "You" means the person using the app.
+In this policy, "we" and "us" mean **Ashwin Goyal**, an individual developer based in India, the data fiduciary responsible for Immortal. "You" means the person using the app.
 
-Questions, requests, or complaints: **[PRIVACY CONTACT EMAIL]**.
+Questions, requests, or complaints: **ashwingoyal2006@gmail.com**.
 
 ---
 
@@ -37,6 +37,8 @@ Questions, requests, or complaints: **[PRIVACY CONTACT EMAIL]**.
 | Practice circles you host or join, and the location you give for them | When you create or RSVP | So others can find and attend |
 | Your acceptance of the practice-circle waiver | On RSVP | To record that you accepted it |
 | Daily reminder preference and time | Settings | To schedule your local notification |
+| Lineages you record or take up, the days you log on them, and your field notes | When you create, join, log or write | Lineages and field notes are visible to other members; the days you log show as a count beside your name on that lineage |
+| Reports you send about content or people, and the people you block | When you report or block | To keep the community safe. Reports are seen only by our moderators; the person reported is not told who sent it. Blocks are never shown to the person blocked |
 
 ### Information generated automatically
 
@@ -44,6 +46,7 @@ Questions, requests, or complaints: **[PRIVACY CONTACT EMAIL]**.
 |---|---|---|
 | Session token | Keeps you signed in | 30 days, then it expires and is deleted |
 | Days practised, and the growth stage derived from them | Computed from your entries and shown on your profile | While your account exists |
+| Your device's time zone | Sent with each request so a day of practice is your day, not the server's. Used to date your entries and discarded; it is not stored | Not stored |
 | **IP address**, on sign-in and registration attempts | To rate-limit brute-force and credential-stuffing attacks. This is a security measure and nothing else | **Automatically deleted after 5 minutes** |
 
 ### Device location
@@ -92,6 +95,7 @@ Immortal is not a medical service and we are not your healthcare provider. Nothi
 - Journal entries you mark public appear in the community feed with your name attached.
 - Comments you post are visible to anyone who can see the entry they are on.
 - If you host or join a practice circle, other attendees see your display name, and the location you gave for the circle is visible to anyone who can see it.
+- Our moderators can read content that has been reported, in order to decide whether it breaks the rules in our Terms.
 
 ### Service providers
 
@@ -125,6 +129,7 @@ Our infrastructure providers operate in multiple countries, so your data may be 
 | Deleted journal entries | Marked deleted and hidden immediately; purged from backups within 30 days |
 | Session tokens | 30 days, then automatically deleted |
 | Sign-in attempt records with IP | 5 minutes, then automatically deleted |
+| Reports you sent, and blocks | Until you delete your account. Reports about content are kept with the moderation record after they are resolved |
 | Backups | Rolling, overwritten within 30 days |
 
 ---
@@ -142,7 +147,7 @@ Whatever country you are in, you can ask us to:
 
 **You can delete your account yourself, in the app**, under Settings → Delete account. It takes effect immediately.
 
-**For anything else — access, correction, export, or withdrawing consent — email [PRIVACY CONTACT EMAIL].** We will respond within 30 days.
+**For anything else — access, correction, export, or withdrawing consent — email ashwingoyal2006@gmail.com.** We will respond within 30 days.
 
 Deleting your account erases your profile, every journal entry, your comments, your RSVPs, who you follow and who follows you, any practice circles you were hosting, and the lineages you recorded, the days you logged on lineages and the field notes you left. Deleting your account does not cancel a store subscription; cancel it in your Google Play or App Store settings. Nothing is anonymised and kept; it is removed. Note that anything you published publicly may already have been seen or copied by others, and deletion here cannot reach that.
 
@@ -170,7 +175,7 @@ No system is perfectly secure. If we discover a breach affecting your personal d
 
 Immortal is for adults. **You must be 18 or older to create an account.**
 
-Some practices in the app involve physical exertion and breath retention, and the community includes real-world meetings — neither is appropriate for children. We do not knowingly collect data from anyone under 18. If we learn that we have, we will delete the account and its data. If you believe a child has created an account, write to **[PRIVACY CONTACT EMAIL]**.
+Some practices in the app involve physical exertion and breath retention, and the community includes real-world meetings — neither is appropriate for children. We do not knowingly collect data from anyone under 18. If we learn that we have, we will delete the account and its data. If you believe a child has created an account, write to **ashwingoyal2006@gmail.com**.
 
 ---
 
@@ -182,8 +187,7 @@ If we change this policy in a way that materially affects your rights, we will t
 
 ## 12. Contact
 
-**[LEGAL ENTITY NAME]**
-[REGISTERED ADDRESS]
-**[PRIVACY CONTACT EMAIL]**
+**Ashwin Goyal**
+**ashwingoyal2006@gmail.com**
 
 If you are unhappy with how we have handled a privacy request, say so at that address and we will escalate it internally before you need to go to a regulator.

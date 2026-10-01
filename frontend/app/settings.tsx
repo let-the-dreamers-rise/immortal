@@ -1,16 +1,19 @@
 import { useState } from "react";
-import { Alert, Linking, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Linking, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X, SignOut, Bell, Trash, Crown, Key } from "phosphor-react-native";
+import { X, SignOut, Bell, Trash, Crown, Key } from "@/src/components/icons";
 
 import { Button, Chip, Divider, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { apiFetch, errorMessage } from "@/src/api/client";
+import { notify } from "@/src/utils/feedback";
 import { useAuth } from "@/src/context/AuthContext";
 import * as purchases from "@/src/billing/purchases";
 import { cancelDailyReminder, requestReminderPermission, scheduleDailyReminder } from "@/src/utils/reminders";
 import { colors, fonts, radius, spacing } from "@/src/theme";
+import { goBack } from "@/src/utils/navigation";
+import { shareApp } from "@/src/utils/share";
 
 const TIME_PRESETS = [
   { h: 6, m: 0, label: "6:00 AM" },
@@ -39,13 +42,20 @@ export default function Settings() {
   const [remEnabled, setRemEnabled] = useState(user?.reminder_enabled ?? false);
   const [remHour, setRemHour] = useState(user?.reminder_hour ?? 8);
   const [blocked, setBlocked] = useState(false);
+  const [profileErr, setProfileErr] = useState<string | null>(null);
 
+  // The reminder itself lives on the phone; the server copy only restores it
+  // on a new device, so a failed save is worth a word but not a rollback.
   const persistReminder = async (enabled: boolean, hour: number) => {
-    const res = await apiFetch<{ user: any }>("/profile/reminder", {
-      method: "PATCH",
-      body: { enabled, hour, minute: 0 },
-    });
-    setUser(res.user);
+    try {
+      const res = await apiFetch<{ user: any }>("/profile/reminder", {
+        method: "PATCH",
+        body: { enabled, hour, minute: 0 },
+      });
+      setUser(res.user);
+    } catch (e) {
+      notify("Reminder set on this phone only", errorMessage(e));
+    }
   };
 
   const toggleReminder = async () => {
@@ -76,12 +86,20 @@ export default function Settings() {
   };
 
   const save = async () => {
-    setBusy(true);
+    if (busy) return;
     setSaved(false);
+    setProfileErr(null);
+    if (name.trim().length < 2) {
+      setProfileErr("Your display name needs at least 2 characters.");
+      return;
+    }
+    setBusy(true);
     try {
       const res = await apiFetch<{ user: any }>("/profile", { method: "PATCH", body: { display_name: name, bio } });
       setUser(res.user);
       setSaved(true);
+    } catch (e) {
+      setProfileErr(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -111,9 +129,9 @@ export default function Settings() {
     try {
       const found = await purchases.restore();
       await refreshPremium();
-      Alert.alert(found ? "Restored" : "Nothing to restore", found ? "Your Inner Chamber membership is active." : "No active membership was found for this store account.");
+      notify(found ? "Restored" : "Nothing to restore", found ? "Your Inner Chamber membership is active." : "No active membership was found for this store account.");
     } catch (e: any) {
-      Alert.alert("Restore failed", e?.message ?? "Please try again.");
+      notify("Restore failed", e?.message ?? "Please try again.");
     } finally {
       setRestoring(false);
     }
@@ -123,7 +141,7 @@ export default function Settings() {
     try {
       await logoutEverywhere();
     } catch (e: any) {
-      Alert.alert("Could not sign out", e?.message ?? "Please try again.");
+      notify("Could not sign out", e?.message ?? "Please try again.");
     }
   };
 
@@ -133,7 +151,7 @@ export default function Settings() {
       await apiFetch("/account", { method: "DELETE", body: { confirm: confirmDelete } });
       await logout();
     } catch (e: any) {
-      Alert.alert("Could not delete", e?.message ?? "Please try again.");
+      notify("Could not delete", e?.message ?? "Please try again.");
     } finally {
       setDeleting(false);
     }
@@ -142,7 +160,7 @@ export default function Settings() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="settings-close-button">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="settings-close-button">
           <X size={24} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
         <Txt variant="label">Settings</Txt>
@@ -155,7 +173,7 @@ export default function Settings() {
         keyboardShouldPersistTaps="handled"
       >
         <Txt variant="caption" style={{ marginBottom: spacing.xs }}>DISPLAY NAME</Txt>
-        <TextInput value={name} onChangeText={setName} style={styles.input} placeholderTextColor={colors.muted} testID="settings-name-input" />
+        <TextInput value={name} onChangeText={setName} maxLength={40} style={styles.input} placeholderTextColor={colors.muted} testID="settings-name-input" />
 
         <Txt variant="caption" style={{ marginTop: spacing.lg, marginBottom: spacing.xs }}>BIO</Txt>
         <TextInput
@@ -164,12 +182,14 @@ export default function Settings() {
           placeholder="A line about your practice…"
           placeholderTextColor={colors.muted}
           multiline
+          maxLength={280}
           style={[styles.input, { minHeight: 90, textAlignVertical: "top" }]}
           testID="settings-bio-input"
         />
 
         <Button label="Save changes" onPress={save} loading={busy} style={{ marginTop: spacing.lg }} testID="settings-save-button" />
         {saved ? <Txt variant="bodySm" color={colors.success} center style={{ marginTop: spacing.sm }}>Saved.</Txt> : null}
+        {profileErr ? <Txt variant="bodySm" color={colors.error} center style={{ marginTop: spacing.sm }}>{profileErr}</Txt> : null}
 
         <Divider style={{ marginVertical: spacing.xxl }} />
 
@@ -179,7 +199,7 @@ export default function Settings() {
             <Bell size={18} color={colors.brandPrimary} weight="regular" />
             <Txt variant="label" style={{ marginLeft: spacing.sm }}>Daily reminder</Txt>
           </View>
-          <Pressable onPress={toggleReminder} testID="reminder-toggle" style={[styles.switch, remEnabled && styles.switchOn]}>
+          <Pressable onPress={toggleReminder} accessibilityRole="switch" accessibilityLabel="Daily reminder" accessibilityState={{ checked: remEnabled }} testID="reminder-toggle" style={[styles.switch, remEnabled && styles.switchOn]}>
             <View style={[styles.knob, remEnabled && styles.knobOn]} />
           </Pressable>
         </View>
@@ -251,6 +271,7 @@ export default function Settings() {
             placeholder="Current password"
             placeholderTextColor={colors.muted}
             secureTextEntry
+            maxLength={128}
             autoCapitalize="none"
             style={[styles.input, { marginTop: spacing.md }]}
             testID="settings-current-password"
@@ -262,6 +283,7 @@ export default function Settings() {
           placeholder="New password (8+ characters)"
           placeholderTextColor={colors.muted}
           secureTextEntry
+          maxLength={128}
           autoCapitalize="none"
           style={[styles.input, { marginTop: spacing.md }]}
           testID="settings-new-password"
@@ -272,6 +294,26 @@ export default function Settings() {
           </Txt>
         ) : null}
         <Button label="Save password" variant="secondary" small loading={pwBusy} onPress={submitPassword} style={{ marginTop: spacing.md }} testID="settings-save-password" />
+
+        <Divider style={{ marginVertical: spacing.xxl }} />
+
+        <Pressable onPress={shareApp} style={styles.logout} testID="settings-share-link">
+          <Txt variant="bodySm" color={colors.brandPrimary}>Share Immortal with someone</Txt>
+        </Pressable>
+        <Pressable onPress={() => router.push("/blocked")} style={styles.logout} testID="settings-blocked-link">
+          <Txt variant="bodySm" color={colors.onSurfaceSecondary}>Blocked people</Txt>
+        </Pressable>
+        {user?.is_moderator ? (
+          <Pressable onPress={() => router.push("/moderation")} style={styles.logout} testID="settings-moderation-link">
+            <Txt variant="bodySm" color={colors.onSurfaceSecondary}>Review reports</Txt>
+          </Pressable>
+        ) : null}
+        <Pressable onPress={() => router.push("/legal/terms")} style={styles.logout} testID="settings-terms-link">
+          <Txt variant="bodySm" color={colors.onSurfaceSecondary}>Terms of Service</Txt>
+        </Pressable>
+        <Pressable onPress={() => router.push("/legal/privacy")} style={styles.logout} testID="settings-privacy-link">
+          <Txt variant="bodySm" color={colors.onSurfaceSecondary}>Privacy Policy</Txt>
+        </Pressable>
 
         <Divider style={{ marginVertical: spacing.xxl }} />
 

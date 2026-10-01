@@ -1,20 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
-import { X, MapPin } from "phosphor-react-native";
+import { X, MapPin } from "@/src/components/icons";
 
 import { Button, Chip, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
 import { colors, fonts, radius, spacing } from "@/src/theme";
+import { goBack } from "@/src/utils/navigation";
 
-const TRADITIONS = [
-  { key: "dao", label: "Dao" },
-  { key: "ayurveda", label: "Ayurveda" },
-  { key: "mixed", label: "Mixed" },
-];
 const HOURS = [6, 7, 8, 9, 12, 17, 18, 19];
 
 function nextDays(n: number) {
@@ -42,10 +38,10 @@ function hourLabel(h: number) {
 export default function NewMeetup() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const days = nextDays(14);
+  // Fixed for the life of the screen, so the chosen day still exists after midnight.
+  const days = useMemo(() => nextDays(14), []);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [tradition, setTradition] = useState("dao");
   const [locationName, setLocationName] = useState("");
   const [city, setCity] = useState("");
   const [dayKey, setDayKey] = useState(days[1].key);
@@ -61,11 +57,14 @@ export default function NewMeetup() {
       if (!granted && canAskAgain) {
         granted = (await Location.requestForegroundPermissionsAsync()).status === "granted";
       }
-      if (!granted) return;
-      const pos = await Location.getCurrentPositionAsync({});
+      if (!granted) {
+        setError("Location is off for Immortal. You can still host; the circle just will not sort by distance.");
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     } catch {
-      // ignore
+      setError("Could not find your location. You can still host without it.");
     }
   };
 
@@ -73,9 +72,11 @@ export default function NewMeetup() {
     setError(null);
     if (title.trim().length < 3) return setError("Give your circle a clear title.");
     if (locationName.trim().length < 2 || city.trim().length < 1) return setError("Add a public location and city.");
-    const day = days.find((d) => d.key === dayKey)!.date;
+    const day = (days.find((d) => d.key === dayKey) ?? days[1]).date;
     const starts = new Date(day);
     starts.setHours(hour, 0, 0, 0);
+    if (starts.getTime() < Date.now()) return setError("That time has already passed today. Pick a later hour or another day.");
+    if (busy) return;
     setBusy(true);
     try {
       const res = await apiFetch<{ meetup: { meetup_id: string } }>("/meetups", {
@@ -83,7 +84,7 @@ export default function NewMeetup() {
         body: {
           title: title.trim(),
           description: description.trim(),
-          tradition,
+          tradition: "dao",
           location_name: locationName.trim(),
           city: city.trim(),
           starts_at: starts.toISOString(),
@@ -102,7 +103,7 @@ export default function NewMeetup() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="meetup-close-button">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="meetup-close-button">
           <X size={24} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
         <Txt variant="label">Host a circle</Txt>
@@ -111,21 +112,14 @@ export default function NewMeetup() {
 
       <KeyboardAwareScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: insets.bottom + 100 }} bottomOffset={24} keyboardShouldPersistTaps="handled">
         <Lbl>TITLE</Lbl>
-        <TextInput value={title} onChangeText={setTitle} placeholder="Morning Ba Duan Jin in the park" placeholderTextColor={colors.muted} style={styles.input} testID="meetup-title-input" />
+        <TextInput value={title} onChangeText={setTitle} placeholder="Morning Ba Duan Jin in the park" placeholderTextColor={colors.muted} maxLength={100} style={styles.input} testID="meetup-title-input" />
 
         <Lbl>WHAT TO EXPECT</Lbl>
-        <TextInput value={description} onChangeText={setDescription} placeholder="A gentle group practice, all levels welcome…" placeholderTextColor={colors.muted} multiline style={[styles.input, { minHeight: 90, textAlignVertical: "top" }]} testID="meetup-desc-input" />
-
-        <Lbl>TRADITION</Lbl>
-        <View style={styles.chips}>
-          {TRADITIONS.map((t) => (
-            <Chip key={t.key} label={t.label} active={tradition === t.key} onPress={() => setTradition(t.key)} testID={`meetup-tradition-${t.key}`} />
-          ))}
-        </View>
+        <TextInput value={description} onChangeText={setDescription} placeholder="A gentle group practice, all levels welcome…" placeholderTextColor={colors.muted} multiline maxLength={1000} style={[styles.input, { minHeight: 90, textAlignVertical: "top" }]} testID="meetup-desc-input" />
 
         <Lbl>PUBLIC LOCATION</Lbl>
-        <TextInput value={locationName} onChangeText={setLocationName} placeholder="e.g. Riverside Park pavilion" placeholderTextColor={colors.muted} style={styles.input} testID="meetup-location-input" />
-        <TextInput value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={colors.muted} style={[styles.input, { marginTop: spacing.sm }]} testID="meetup-city-input" />
+        <TextInput value={locationName} onChangeText={setLocationName} placeholder="e.g. Riverside Park pavilion" placeholderTextColor={colors.muted} maxLength={140} style={styles.input} testID="meetup-location-input" />
+        <TextInput value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={colors.muted} maxLength={80} style={[styles.input, { marginTop: spacing.sm }]} testID="meetup-city-input" />
         <Pressable onPress={attachLocation} style={styles.locBtn} testID="meetup-attach-location">
           <MapPin size={16} color={coords ? colors.success : colors.brandSecondary} weight="regular" />
           <Txt variant="bodySm" color={coords ? colors.success : colors.brandSecondary} style={{ marginLeft: spacing.sm }}>

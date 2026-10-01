@@ -121,10 +121,8 @@ PHASE_PREFERENCE = {
 # here, and kapalabhati at 10pm would be actively bad advice.
 NIGHT_SAFE = {
     "micro-yan-jin",
-    "micro-kaya-sthairyam",
     "micro-dantian-breaths",
     "micro-eye-rest",
-    "micro-dirgha",
 }
 
 
@@ -142,6 +140,9 @@ def pick_suggestion(
     `seed` rotates the choice day by day so the same practice does not appear
     every morning, without needing to store what was shown.
     """
+    # Ways of living (diet, sleep, seasons) have no length and nothing to time,
+    # so they never stand in for "what do I do right now".
+    practices = [p for p in practices if p.get("seconds") or p.get("time_min")]
     by_id = {p["practice_id"]: p for p in practices}
 
     def pool(kind: str) -> list:
@@ -154,7 +155,11 @@ def pick_suggestion(
         return []
 
     order = PHASE_PREFERENCE.get(phase, ["micro"])
-    if total_days < ONRAMP_DAYS:
+    if total_days == 0:
+        # The very first practice is a seated minute: someone who has just
+        # signed up is holding a phone, probably sitting, not out on a walk.
+        order = ["micro"]
+    elif total_days < ONRAMP_DAYS:
         # Early on, offer only what can be said yes to standing up.
         order = ["micro"] if phase == "night" else ["on_the_go", "micro"]
 

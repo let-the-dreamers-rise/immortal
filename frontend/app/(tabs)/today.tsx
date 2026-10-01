@@ -2,10 +2,11 @@ import { useCallback, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GearSix } from "phosphor-react-native";
+import { GearSix } from "@/src/components/icons";
 
-import { Loading, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { Button, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage } from "@/src/api/client";
+import { notify } from "@/src/utils/feedback";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
@@ -51,6 +52,8 @@ type Today = {
 
 function duration(p: Practice) {
   if (p.seconds) return `${p.seconds} seconds`;
+  // Long sets open as their five-minute version (see the session screen).
+  if (p.time_min > 5) return `5 min, or the full ${p.time_min}`;
   return `${p.time_min} min`;
 }
 
@@ -59,15 +62,33 @@ export default function TodayScreen() {
   const router = useRouter();
   const { loading: authLoading } = useAuth();
   const [data, setData] = useState<Today | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [marking, setMarking] = useState(false);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       setData(await apiFetch<Today>("/today"));
-    } catch {
-      setData(null);
+    } catch (e) {
+      // Keep what is on screen if there is something; otherwise say so.
+      setError(errorMessage(e));
     }
   }, []);
+
+  // For a day practised away from the app: count it in one tap.
+  const markDone = async () => {
+    if (marking) return;
+    setMarking(true);
+    try {
+      await apiFetch("/logs", { method: "POST", body: { body: "", nothing_happened: true, visibility: "private" } });
+      await load();
+    } catch (e) {
+      notify("Today was not counted", errorMessage(e));
+    } finally {
+      setMarking(false);
+    }
+  };
 
   // Wait for the session token to be restored before fetching.
   useFocusEffect(
@@ -90,13 +111,13 @@ export default function TodayScreen() {
         <Txt variant="caption" color={colors.muted}>
           {data?.phase_label ?? ""}
         </Txt>
-        <Pressable testID="today-settings-button" onPress={() => router.push("/settings")} hitSlop={12}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" testID="today-settings-button" onPress={() => router.push("/settings")} hitSlop={12}>
           <GearSix size={22} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
       </View>
 
       {!data ? (
-        <Loading />
+        error ? <ErrorState message={error} onRetry={load} /> : <Loading />
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xxxl }}
@@ -165,6 +186,12 @@ export default function TodayScreen() {
                       {data.suggestion.cue}
                     </Txt>
                   ) : null}
+                  <Button
+                    label="Begin"
+                    onPress={() => router.push(`/session/${data.suggestion!.practice_id}`)}
+                    style={{ marginTop: spacing.lg }}
+                    testID="today-begin"
+                  />
                 </Pressable>
 
                 {/* Always a smaller option, so there is a way to say yes on a
@@ -204,6 +231,17 @@ export default function TodayScreen() {
                 </Txt>
                 <Txt variant="body" style={{ marginTop: 2 }}>
                   {data.stage_title}
+                </Txt>
+              </Pressable>
+            ) : null}
+
+            {!data.logged_today ? (
+              <Pressable testID="today-mark-done" onPress={markDone} disabled={marking} style={styles.journalRow}>
+                <Txt variant="bodySm" color={colors.brandPrimary}>
+                  {marking ? "Counting today…" : "Practised on your own? Count today"}
+                </Txt>
+                <Txt variant="caption" color={colors.muted} style={{ marginTop: 2 }}>
+                  Any practice counts, here or anywhere else.
                 </Txt>
               </Pressable>
             ) : null}

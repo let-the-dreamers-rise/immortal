@@ -1,14 +1,16 @@
 import { useCallback, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft, CaretRight, Info } from "phosphor-react-native";
+import { CaretLeft, CaretRight, Info } from "@/src/components/icons";
 
-import { Badge, Button, Loading, Txt } from "@/src/components/ui";
-import { apiFetch, mediaUri } from "@/src/api/client";
+import { Badge, Button, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage, mediaUri } from "@/src/api/client";
+import { notify } from "@/src/utils/feedback";
 import { colors, IMAGES, radius, spacing } from "@/src/theme";
+import { goBack } from "@/src/utils/navigation";
 
 type Practice = { practice_id: string; title: string; category: string; time_min: number; illustration_url: string; has_illustration: boolean };
 type Stage = {
@@ -36,10 +38,16 @@ export default function StageDetail() {
   const [busy, setBusy] = useState(false);
   const [assessing, setAssessing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await apiFetch<{ stage: Stage }>(`/path/stages/${order}`);
-    setStage(res.stage);
+    setError(null);
+    try {
+      const res = await apiFetch<{ stage: Stage }>(`/path/stages/${order}`);
+      setStage(res.stage);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
   }, [order]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -51,7 +59,7 @@ export default function StageDetail() {
       await load();
     } catch (e: any) {
       if (e?.status === 402) router.push("/paywall");
-      else Alert.alert("Could not begin", e?.message ?? "Please try again.");
+      else notify("Could not begin", e?.message ?? "Please try again.");
     } finally {
       setBusy(false);
     }
@@ -67,6 +75,8 @@ export default function StageDetail() {
       });
       setResult(res.reason);
       await load();
+    } catch (e) {
+      setResult(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -74,8 +84,11 @@ export default function StageDetail() {
 
   if (!stage) {
     return (
-      <View style={styles.container}>
-        <Loading />
+      <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" style={{ padding: spacing.lg }} onPress={() => goBack(router)} hitSlop={10}>
+          <CaretLeft size={22} color={colors.onSurface} weight="bold" />
+        </Pressable>
+        {error ? <ErrorState message={error} onRetry={load} /> : <Loading />}
       </View>
     );
   }
@@ -86,7 +99,7 @@ export default function StageDetail() {
         <View style={styles.hero}>
           <Image source={{ uri: IMAGES.pathHero }} style={StyleSheet.absoluteFill} contentFit="cover" />
           <LinearGradient colors={["rgba(26,25,24,0.35)", "rgba(26,25,24,0.8)"]} style={StyleSheet.absoluteFill} />
-          <Pressable style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => router.back()} testID="stage-back-button" hitSlop={10}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" style={[styles.back, { top: insets.top + spacing.sm }]} onPress={() => goBack(router)} testID="stage-back-button" hitSlop={10}>
             <CaretLeft size={22} color={colors.onSurfaceInverse} weight="bold" />
           </Pressable>
           <View style={styles.heroContent}>

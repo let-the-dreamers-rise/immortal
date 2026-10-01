@@ -2,10 +2,13 @@ import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CaretLeft, MapPin, CalendarBlank, Check, Users } from "phosphor-react-native";
+import { CaretLeft, MapPin, CalendarBlank, Check, Users } from "@/src/components/icons";
 
-import { Avatar, Button, Loading, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { Avatar, Button, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage } from "@/src/api/client";
+import { MoreMenu } from "@/src/safety/MoreMenu";
+import { confirmAction } from "@/src/utils/feedback";
+import { goBack } from "@/src/utils/navigation";
 import { colors, radius, spacing } from "@/src/theme";
 
 type Attendee = { user_id: string; display_name: string; picture?: string | null };
@@ -32,11 +35,17 @@ export default function MeetupDetail() {
   const [waiver, setWaiver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await apiFetch<{ meetup: Meetup }>(`/meetups/${id}`);
-    setM(res.meetup);
-    setWaiver(res.meetup.is_rsvped);
+    setLoadErr(null);
+    try {
+      const res = await apiFetch<{ meetup: Meetup }>(`/meetups/${id}`);
+      setM(res.meetup);
+      setWaiver(res.meetup.is_rsvped);
+    } catch (e) {
+      setLoadErr(errorMessage(e));
+    }
   }, [id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -56,29 +65,63 @@ export default function MeetupDetail() {
   };
 
   const cancel = async () => {
+    setErr(null);
     setBusy(true);
     try {
       await apiFetch(`/meetups/${id}/rsvp`, { method: "DELETE" });
       await load();
+    } catch (e) {
+      setErr(errorMessage(e));
     } finally {
       setBusy(false);
     }
   };
 
   const cancelCircle = async () => {
+    const ok = await confirmAction(
+      "Cancel this circle?",
+      "It disappears for everyone who said they were going.",
+      "Cancel circle",
+      true
+    );
+    if (!ok) return;
+    setErr(null);
     setBusy(true);
     try {
       await apiFetch(`/meetups/${id}`, { method: "DELETE" });
-      router.back();
+      goBack(router);
+    } catch (e) {
+      setErr(errorMessage(e));
     } finally {
       setBusy(false);
     }
   };
 
+  const topbar = (
+    <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="meetup-detail-back">
+        <CaretLeft size={22} color={colors.onSurface} weight="bold" />
+      </Pressable>
+      <Txt variant="label">Practice circle</Txt>
+      {m && !m.is_host ? (
+        <MoreMenu
+          kind="meetup"
+          targetId={m.meetup_id}
+          authorId={m.host.user_id}
+          authorName={m.host.display_name}
+          onBlocked={() => goBack(router)}
+        />
+      ) : (
+        <View style={{ width: 22 }} />
+      )}
+    </View>
+  );
+
   if (!m) {
     return (
       <View style={styles.container}>
-        <Loading />
+        {topbar}
+        {loadErr ? <ErrorState message={loadErr} onRetry={load} /> : <Loading />}
       </View>
     );
   }
@@ -87,13 +130,7 @@ export default function MeetupDetail() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.topbar, { paddingTop: insets.top + spacing.sm }]}>
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="meetup-detail-back">
-          <CaretLeft size={22} color={colors.onSurface} weight="bold" />
-        </Pressable>
-        <Txt variant="label">Practice circle</Txt>
-        <View style={{ width: 22 }} />
-      </View>
+      {topbar}
 
       <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: insets.bottom + spacing.xl }} showsVerticalScrollIndicator={false}>
         <Txt variant="caption" color={colors.brandPrimary}>{m.tradition.toUpperCase()}</Txt>
@@ -157,10 +194,14 @@ export default function MeetupDetail() {
                 take responsibility for my own wellbeing.
               </Txt>
             </Pressable>
-            {err ? <Txt variant="bodySm" color={colors.error} style={{ marginTop: spacing.sm }} testID="meetup-detail-error">{err}</Txt> : null}
+            <Txt variant="caption" style={{ marginTop: spacing.sm }}>
+              Circles are hosted by members, not by Immortal. Meet in a public place, tell someone where you are
+              going, and leave if anything feels wrong.
+            </Txt>
             <Button label="Join this circle" onPress={join} loading={busy} style={{ marginTop: spacing.md }} testID="meetup-join-button" />
           </View>
         )}
+        {err ? <Txt variant="bodySm" color={colors.error} style={{ marginTop: spacing.sm }} testID="meetup-detail-error">{err}</Txt> : null}
       </ScrollView>
     </View>
   );

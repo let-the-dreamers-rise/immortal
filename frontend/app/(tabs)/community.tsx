@@ -1,14 +1,16 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GearSix, ChatCircle, MapPin, CalendarBlank } from "phosphor-react-native";
+import { GearSix, ChatCircle, MapPin, CalendarBlank } from "@/src/components/icons";
 import * as Location from "expo-location";
 
-import { Avatar, Button, EmptyState, Loading, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { Avatar, Button, EmptyState, ErrorState, Loading, Txt } from "@/src/components/ui";
+import { apiFetch, errorMessage } from "@/src/api/client";
+import { MoreMenu } from "@/src/safety/MoreMenu";
+import { notify } from "@/src/utils/feedback";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, fonts, IMAGES, radius, spacing } from "@/src/theme";
 import { LineagesPanel } from "@/src/lineages/LineagesPanel";
@@ -64,8 +66,10 @@ export default function CommunityScreen() {
   const [people, setPeople] = useState<Practitioner[]>([]);
   const [feed, setFeed] = useState<FeedLog[]>([]);
   const [meetups, setMeetups] = useState<Meetup[]>([]);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const coords = useRef<{ lat: number; lng: number } | null>(null);
+  const [nearby, setNearby] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadMeetups = useCallback(async (c: { lat: number; lng: number } | null) => {
@@ -75,21 +79,24 @@ export default function CommunityScreen() {
   }, []);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       const [s, p, f] = await Promise.all([
         apiFetch<{ stats: Stats }>("/stats/me"),
         apiFetch<{ practitioners: Practitioner[] }>("/community/practitioners"),
         apiFetch<{ logs: FeedLog[] }>("/logs/feed"),
+        loadMeetups(coords.current),
       ]);
       setStats(s.stats);
       setPeople(p.practitioners);
       setFeed(f.logs);
       setReloadKey((k) => k + 1);
-      await loadMeetups(coords);
+    } catch (e) {
+      setError(errorMessage(e));
     } finally {
       setLoading(false);
     }
-  }, [coords, loadMeetups]);
+  }, [loadMeetups]);
 
   const findNearby = async () => {
     try {
@@ -99,13 +106,17 @@ export default function CommunityScreen() {
         const req = await Location.requestForegroundPermissionsAsync();
         granted = req.status === "granted";
       }
-      if (!granted) return;
-      const pos = await Location.getCurrentPositionAsync({});
+      if (!granted) {
+        notify("Location is off", "Allow location for Immortal in your phone's settings to sort circles by distance.");
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setCoords(c);
+      coords.current = c;
+      setNearby(true);
       await loadMeetups(c);
     } catch {
-      // ignore
+      notify("Could not find your location", "Try again in a moment, or browse every circle below.");
     }
   };
 
@@ -117,6 +128,11 @@ export default function CommunityScreen() {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  };
+
+  const dropAuthor = (authorId: string) => {
+    setFeed((prev) => prev.filter((x) => x.author.user_id !== authorId));
+    setPeople((prev) => prev.filter((x) => x.user_id !== authorId));
   };
 
   const toggleFollow = async (p: Practitioner) => {
@@ -132,13 +148,15 @@ export default function CommunityScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <Txt variant="title" style={{ fontSize: 22 }}>Community</Txt>
-        <Pressable testID="community-settings-button" onPress={() => router.push("/settings")} hitSlop={12}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" testID="community-settings-button" onPress={() => router.push("/settings")} hitSlop={12}>
           <GearSix size={24} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
       </View>
 
       {loading ? (
         <Loading />
+      ) : error && !stats ? (
+        <ErrorState message={error} onRetry={() => { setLoading(true); load(); }} />
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
@@ -225,7 +243,16 @@ export default function CommunityScreen() {
                     <Pressable style={styles.feedItem} onPress={() => router.push(`/log/${l.log_id}`)} testID={`feed-log-${l.log_id}`}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                         <Avatar name={l.author.display_name} uri={l.author.picture} size={32} />
-                        <Txt variant="label">{l.author.display_name}</Txt>
+                        <Txt variant="label" style={{ flex: 1 }}>{l.author.display_name}</Txt>
+                        {l.author.user_id !== user?.user_id ? (
+                          <MoreMenu
+                            kind="log"
+                            targetId={l.log_id}
+                            authorId={l.author.user_id}
+                            authorName={l.author.display_name}
+                            onBlocked={() => dropAuthor(l.author.user_id)}
+                          />
+                        ) : null}
                       </View>
                       <Txt variant="body" style={{ marginTop: spacing.sm }}>
                         {l.nothing_happened && !l.body ? "Nothing happened today — and that is part of it." : l.body}
@@ -252,7 +279,7 @@ export default function CommunityScreen() {
             <View style={{ paddingHorizontal: spacing.xl }}>
               <View style={styles.meetupActions}>
                 <Button label="Host a circle" onPress={() => router.push("/meetup/new")} testID="meetup-host-button" style={{ flex: 1 }} />
-                {!coords ? (
+                {!nearby ? (
                   <Button label="Near me" variant="secondary" small onPress={findNearby} testID="meetup-nearby-button" />
                 ) : null}
               </View>

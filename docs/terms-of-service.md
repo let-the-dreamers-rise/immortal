@@ -2,11 +2,11 @@
 
 **Last updated: 18 September 2026**
 
-These terms are the agreement between you and **[LEGAL ENTITY NAME]**, **[REGISTERED ADDRESS]** ("we", "us") covering your use of the Immortal app.
+These terms are the agreement between you and **Ashwin Goyal**, an individual developer based in India ("we", "us") covering your use of the Immortal app.
 
 By creating an account you accept them. If you do not accept them, do not use the app.
 
-Contact: **[SUPPORT CONTACT EMAIL]**
+Contact: **ashwingoyal2006@gmail.com**
 
 ---
 
@@ -14,7 +14,7 @@ Contact: **[SUPPORT CONTACT EMAIL]**
 
 **Immortal is not medical advice, medical treatment, or a healthcare service. It does not diagnose, treat, cure, mitigate, or prevent any disease or condition.**
 
-The app presents traditional Daoist and Ayurvedic practices as **historical material and personal exploration**. Where it describes what those traditions claimed, it is reporting what a tradition claimed — not telling you it is true, and not telling you it will happen to you. Where it cites modern research, it is summarising published work, not making a promise about your body.
+The app presents traditional Chinese Daoist practices as **historical material and personal exploration**. Where it describes what those traditions claimed, it is reporting what a tradition claimed — not telling you it is true, and not telling you it will happen to you. Where it cites modern research, it is summarising published work, not making a promise about your body.
 
 **We are not your doctor. We do not know your medical history. We have never examined you.**
 
@@ -29,7 +29,7 @@ Talk to a qualified healthcare professional before starting any new physical or 
 - have a recent injury, surgery, or any condition affecting balance or mobility
 - take medication that affects blood pressure, heart rate, or consciousness
 
-**If something hurts, stop. If something feels wrong, stop.** Use the "something felt wrong" flag so we can see it. If you think you are having a medical emergency, stop using the app and call your local emergency number.
+**If something hurts, stop. If something feels wrong, stop.** Then tell us at **ashwingoyal2006@gmail.com** so we can look at the practice. If you think you are having a medical emergency, stop using the app and call your local emergency number.
 
 ---
 
@@ -55,7 +55,7 @@ If you have a personal or family history of psychosis, bipolar disorder, dissoci
 
 You must be **18 or older**. You must be legally able to enter this agreement. You must not be barred from using the service under applicable law.
 
-One person, one account. Keep your password secret. You are responsible for what happens under your account; tell us promptly at **[SUPPORT CONTACT EMAIL]** if you think someone else has access to it.
+One person, one account. Keep your password secret. You are responsible for what happens under your account; tell us promptly at **ashwingoyal2006@gmail.com** if you think someone else has access to it.
 
 ---
 
@@ -79,7 +79,9 @@ When you mark an entry public, you are choosing to publish it to other users. Ot
 - Someone else's private information
 - Deliberately false claims about your practice or its results
 
-We may remove content that breaks these rules and suspend or terminate accounts that do so repeatedly. We are not obliged to monitor content, and we do not pre-screen it.
+Lineages and field notes have one more rule: **do not post a method that is likely to hurt someone who follows it** (for example, long breath-holding, fasting beyond a day, or anything that tells people to stop medical treatment). Write cautions honestly.
+
+**Reporting and blocking.** Every post, reply, lineage, note, circle and profile has a report option, and you can block any member. When several members report the same item it is hidden until a moderator reviews it. We review reports and may remove content that breaks these rules and suspend or terminate accounts that do so. We are not obliged to monitor content, and we do not pre-screen it.
 
 ---
 
@@ -99,7 +101,7 @@ If you host or attend a circle:
 
 **To the fullest extent the law allows, we accept no liability for anything that happens at, travelling to, or arising from a practice circle** — including personal injury, property loss, or the conduct of any other person.
 
-Report anything unsafe to **[SUPPORT CONTACT EMAIL]**.
+Report anything unsafe to **ashwingoyal2006@gmail.com**.
 
 ---
 
@@ -158,9 +160,9 @@ Sections 5 (your content licence, for backups), 7, 8, 9, 10, and 12 survive term
 
 ## 12. Governing law and disputes
 
-These terms are governed by the laws of India. The courts at **[CITY]**, India have exclusive jurisdiction.
+These terms are governed by the laws of India. The courts of India have exclusive jurisdiction.
 
-**Please write to us before suing us.** Email **[SUPPORT CONTACT EMAIL]** describing the problem. Most things are fixable in an email, and we would rather fix them.
+**Please write to us before suing us.** Email **ashwingoyal2006@gmail.com** describing the problem. Most things are fixable in an email, and we would rather fix them.
 
 If you are a consumer resident elsewhere, this clause does not deprive you of the protection of mandatory consumer-protection laws in your country of residence.
 
@@ -181,6 +183,5 @@ We may update these terms. If a change materially affects your rights, we will n
 
 ---
 
-**[LEGAL ENTITY NAME]**
-[REGISTERED ADDRESS]
-**[SUPPORT CONTACT EMAIL]**
+**Ashwin Goyal**
+**ashwingoyal2006@gmail.com**

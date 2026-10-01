@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import { GitBranch, NotePencil, UsersThree } from "phosphor-react-native";
+import { GitBranch, NotePencil, UsersThree } from "@/src/components/icons";
 
 import { Txt } from "@/src/components/ui";
 import { colors, radius, spacing } from "@/src/theme";

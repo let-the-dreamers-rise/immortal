@@ -70,9 +70,9 @@ export const fontMap = {
 
 export const IMAGES = {
   pathHero:
-    "https://images.unsplash.com/photo-1768232553319-00e3d669b1f6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxiYW1ib28lMjBmb3Jlc3QlMjBwYXRoJTIwY2FsbSUyMG1pc3QlMjBuYXR1cmV8ZW58MHx8fHwxNzg4MzcyNjg0fDA&ixlib=rb-4.1.0&q=85",
+    "https://images.unsplash.com/photo-1768232553319-00e3d669b1f6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxiYW1ib28lMjBmb3Jlc3QlMjBwYXRoJTIwY2FsbSUyMG1pc3QlMjBuYXR1cmV8ZW58MHx8fHwxNzg4MzcyNjg0fDA&ixlib=rb-4.1.0&q=80&w=900",
   onboardingBg:
-    "https://images.unsplash.com/photo-1695041712957-45634f4fa759?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwxfHxibGFuayUyMGFuY2llbnQlMjBwYXBlciUyMHNjcm9sbCUyMHRleHR1cmUlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4ODM3MjY4NHww&ixlib=rb-4.1.0&q=85",
+    "https://images.unsplash.com/photo-1695041712957-45634f4fa759?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwxfHxibGFuayUyMGFuY2llbnQlMjBwYXBlciUyMHNjcm9sbCUyMHRleHR1cmUlMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc4ODM3MjY4NHww&ixlib=rb-4.1.0&q=80&w=900",
   profileHero:
     "https://images.pexels.com/photos/35298174/pexels-photo-35298174.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
 };

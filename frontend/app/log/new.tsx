@@ -3,10 +3,11 @@ import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView, KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X } from "phosphor-react-native";
+import { X } from "@/src/components/icons";
 
 import { Button, Chip, Txt } from "@/src/components/ui";
-import { apiFetch } from "@/src/api/client";
+import { apiFetch, errorMessage } from "@/src/api/client";
+import { goBack } from "@/src/utils/navigation";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 const MOODS = [
@@ -26,6 +27,7 @@ export default function NewLog() {
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [practiceTitle, setPracticeTitle] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (practice) {
@@ -36,6 +38,12 @@ export default function NewLog() {
   }, [practice]);
 
   const save = async () => {
+    if (busy) return;
+    if (visibility === "public" && !body.trim()) {
+      setError("Write something before sharing it with the community.");
+      return;
+    }
+    setError(null);
     setBusy(true);
     try {
       await apiFetch("/logs", {
@@ -43,13 +51,15 @@ export default function NewLog() {
         body: {
           body,
           mood,
-          nothing_happened: false,
+          nothing_happened: !body.trim(),
           visibility,
           practice_ids: practice ? [practice] : [],
           stage_order: stage ? Number(stage) : null,
         },
       });
-      router.back();
+      goBack(router);
+    } catch (e) {
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -58,7 +68,7 @@ export default function NewLog() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="log-close-button">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="log-close-button">
           <X size={24} color={colors.onSurfaceSecondary} weight="regular" />
         </Pressable>
         <Txt variant="label">Today’s reflection</Txt>
@@ -83,6 +93,7 @@ export default function NewLog() {
           placeholderTextColor={colors.muted}
           multiline
           autoFocus
+          maxLength={5000}
           style={styles.input}
           testID="log-body-input"
         />
@@ -99,6 +110,16 @@ export default function NewLog() {
           <VisBtn label="Private" desc="Only you" active={visibility === "private"} onPress={() => setVisibility("private")} testID="visibility-private" />
           <VisBtn label="Public" desc="Share with the community" active={visibility === "public"} onPress={() => setVisibility("public")} testID="visibility-public" />
         </View>
+        {visibility === "public" ? (
+          <Txt variant="caption" style={{ marginTop: spacing.sm }}>
+            Shared reflections show your display name. Keep health details you would not tell a stranger private.
+          </Txt>
+        ) : null}
+        {error ? (
+          <Txt variant="bodySm" color={colors.error} style={{ marginTop: spacing.md }} testID="log-error">
+            {error}
+          </Txt>
+        ) : null}
       </KeyboardAwareScrollView>
 
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>

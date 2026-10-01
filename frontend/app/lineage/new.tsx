@@ -3,12 +3,13 @@ import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X } from "phosphor-react-native";
+import { X } from "@/src/components/icons";
 
 import { Button, Chip, Txt } from "@/src/components/ui";
 import { apiFetch } from "@/src/api/client";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import type { Lineage, LineageDetail } from "@/src/lineages/types";
+import { goBack } from "@/src/utils/navigation";
 
 const HORIZONS = [
   { days: 40, label: "40 days" },
@@ -90,7 +91,7 @@ export default function NewLineage() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} testID="lineage-new-close">
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => goBack(router)} hitSlop={10} testID="lineage-new-close">
           <X size={24} color={colors.onSurfaceSecondary} />
         </Pressable>
         <Txt variant="label">{parent ? "New branch" : "Record a lineage"}</Txt>

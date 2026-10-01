@@ -4,12 +4,13 @@ import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { X, Check } from "phosphor-react-native";
+import { X, Check } from "@/src/components/icons";
 
 import { Button, Loading, Txt } from "@/src/components/ui";
 import { useAuth } from "@/src/context/AuthContext";
 import * as purchases from "@/src/billing/purchases";
 import { colors, IMAGES, radius, spacing } from "@/src/theme";
+import { goBack } from "@/src/utils/navigation";
 
 const BENEFITS = [
   { title: "The Year 2 path", body: "Nei Gong: meridian work, the dantian and the small heavenly circuit, staged over twelve months." },
@@ -43,7 +44,7 @@ export default function Paywall() {
 
   const done = async (message: string) => {
     await refreshPremium();
-    Alert.alert("Welcome to the Inner Chamber", message, [{ text: "Continue", onPress: () => router.back() }]);
+    Alert.alert("Welcome to the Inner Chamber", message, [{ text: "Continue", onPress: () => goBack(router) }]);
   };
 
   const subscribe = async () => {
@@ -88,7 +89,7 @@ export default function Paywall() {
           <Image source={{ uri: IMAGES.pathHero }} style={StyleSheet.absoluteFill} contentFit="cover" />
           <LinearGradient colors={["rgba(26,25,24,0.35)", "rgba(26,25,24,0.9)"]} style={StyleSheet.absoluteFill} />
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBack(router)}
             hitSlop={12}
             style={[styles.close, { top: insets.top + spacing.sm }]}
             testID="paywall-close"
