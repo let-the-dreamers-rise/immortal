@@ -3,12 +3,14 @@
 import { Platform, Share } from "react-native";
 
 import { notify } from "./feedback";
+import { track } from "@/src/analytics/track";
 
 export const APP_URL = "https://immortal-app-14903.web.app";
 
 const TEXT = "Five quiet minutes a day of Chinese Daoist practice, guided step by step. Try one minute, no account needed:";
 
 export function shareApp() {
+  track("invite_shared", { kind: "app" });
   return shareLink("Immortal", TEXT, APP_URL);
 }
 
@@ -19,6 +21,7 @@ export function lineageUrl(lineageId: string) {
 /** An invitation to carry one lineage together; the link opens a preview for people without an account. */
 export function shareLineage(lineageId: string, title: string, minutes: number) {
   const text = `I'm carrying "${title}" on Immortal, ${minutes} minutes a day. Carry it with me:`;
+  track("invite_shared", { kind: "lineage", lineage_id: lineageId });
   return shareLink(title, text, lineageUrl(lineageId));
 }
 

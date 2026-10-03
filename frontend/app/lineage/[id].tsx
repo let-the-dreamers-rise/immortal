@@ -14,6 +14,7 @@ import { colors, fonts, radius, spacing } from "@/src/theme";
 import { LineageCard } from "@/src/lineages/LineageCard";
 import { LineagePreview } from "@/src/lineages/LineagePreview";
 import { shareLineage } from "@/src/utils/share";
+import { track } from "@/src/analytics/track";
 import { horizonLabel, NOTE_KINDS, type LineageDetail, type LineageNote } from "@/src/lineages/types";
 
 export default function LineageRoute() {
@@ -59,7 +60,11 @@ function LineageScreen() {
     }
   };
 
-  const join = () => act(() => apiFetch(`/lineages/${id}/join`, { method: "POST" }));
+  const join = () =>
+    act(async () => {
+      await apiFetch(`/lineages/${id}/join`, { method: "POST" });
+      track("lineage_joined", { lineage_id: id });
+    });
   const checkin = () => act(() => apiFetch(`/lineages/${id}/checkin`, { method: "POST" }));
   const leave = async () => {
     const ok = await confirmAction(

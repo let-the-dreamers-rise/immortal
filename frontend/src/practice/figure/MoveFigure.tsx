@@ -11,16 +11,17 @@ import { sample, type Move } from "./moves";
 
 const FRAME_MS = 33;
 
-function useClock(playing: boolean, resetKey: unknown): number {
+function useClock(playing: boolean, restartKey: string, move: unknown): number {
   const [t, setT] = useState(0);
   const banked = useRef(0);
   const startedAt = useRef<number | null>(null);
 
   useEffect(() => {
     banked.current = 0;
-    startedAt.current = null;
+    // A restart while playing begins timing again from now.
+    if (startedAt.current !== null) startedAt.current = Date.now();
     setT(0);
-  }, [resetKey]);
+  }, [restartKey, move]);
 
   useEffect(() => {
     if (!playing) return;
@@ -51,16 +52,21 @@ const pts = (list: Vec[]) => list.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(
 export function MoveFigure({
   move,
   playing = true,
+  restartKey,
+  showCue = true,
   size = 180,
   label,
 }: {
   move: Move;
   playing?: boolean;
+  /** Changing this starts the loop again from its first pose, e.g. when a new step begins. */
+  restartKey?: string | number;
+  showCue?: boolean;
   size?: number;
   /** Read by screen readers in place of the drawing. */
   label: string;
 }) {
-  const t = useClock(playing, move);
+  const t = useClock(playing, `${restartKey ?? ""}`, move);
   const s = sample(move, t);
   const sk = skeleton(blend(s.from, s.to, ease(s.progress)));
   const ink = colors.onSurface;
@@ -103,7 +109,7 @@ export function MoveFigure({
         <Line x1={sk.head[0] + turn} y1={sk.head[1] - 1} x2={sk.head[0] + turn * 1.25} y2={sk.head[1] + 4} stroke={ink} strokeWidth={2} strokeLinecap="round" />
       </Svg>
       <Txt variant="caption" color={colors.brandSecondary} center style={styles.cue}>
-        {s.cue ? s.cue.toUpperCase() : " "}
+        {showCue && s.cue ? s.cue.toUpperCase() : " "}
       </Txt>
     </View>
   );

@@ -308,6 +308,11 @@ export default function Settings() {
             <Txt variant="bodySm" color={colors.onSurfaceSecondary}>Review reports</Txt>
           </Pressable>
         ) : null}
+        {user?.is_moderator ? (
+          <Pressable onPress={() => router.push("/stats")} style={styles.logout} testID="settings-stats-link">
+            <Txt variant="bodySm" color={colors.onSurfaceSecondary}>Usage</Txt>
+          </Pressable>
+        ) : null}
         <Pressable onPress={() => router.push("/legal/terms")} style={styles.logout} testID="settings-terms-link">
           <Txt variant="bodySm" color={colors.onSurfaceSecondary}>Terms of Service</Txt>
         </Pressable>

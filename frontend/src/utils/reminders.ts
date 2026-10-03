@@ -13,14 +13,14 @@ Notifications.setNotificationHandler({
 // The reminder names something specific and small enough to say yes to while
 // standing somewhere. A prompt to "practise" asks the reader to decide what
 // and for how long, which is the decision this app exists to remove; a prompt
-// naming forty seconds of tooth tapping on a bus does not.
+// naming a minute of tooth tapping on a bus does not.
 //
 // Rotated by day so the same line does not arrive every morning. No streak is
 // mentioned and no day is described as missed — nothing here should make
 // returning feel like an apology.
 const NUDGES: { title: string; body: string }[] = [
   {
-    title: "Forty seconds, wherever you are",
+    title: "A minute, wherever you are",
     body: "Tapping the teeth — Kou Chi. Nobody can tell you are doing it. Ge Hong wrote it down in 318.",
   },
   {

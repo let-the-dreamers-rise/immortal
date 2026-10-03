@@ -12,6 +12,7 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider, useAuth } from "@/src/context/AuthContext";
 import { colors, fontMap } from "@/src/theme";
 import { takePath } from "@/src/utils/pendingPath";
+import { startTracking } from "@/src/analytics/track";
 
 LogBox.ignoreAllLogs(true);
 
@@ -71,6 +72,7 @@ function RootNavigator() {
       <Stack.Screen name="legal/[doc]" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="blocked" options={{ animation: "slide_from_right" }} />
       <Stack.Screen name="moderation" options={{ animation: "slide_from_right" }} />
+      <Stack.Screen name="stats" options={{ animation: "slide_from_right" }} />
     </Stack>
   );
 }
@@ -80,6 +82,10 @@ export default function RootLayout() {
   const [fontsLoaded, fontsError] = useFonts(fontMap);
 
   const ready = (iconsLoaded || iconsError) && (fontsLoaded || fontsError);
+
+  useEffect(() => {
+    startTracking();
+  }, []);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});

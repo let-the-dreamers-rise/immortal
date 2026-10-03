@@ -28,6 +28,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
 from starlette.middleware.cors import CORSMiddleware
 
+import analytics
 import auth_extra
 import billing
 import lineages
@@ -413,6 +414,7 @@ async def delete_account(body: DeleteAccountIn, user: dict = Depends(get_current
     await db.follows.delete_many({"$or": [{"follower_id": uid}, {"following_id": uid}]})
     await lineages.erase_user(db, uid)
     await safety.erase_user(db, uid)
+    await analytics.erase_user(db, uid)
     await db.password_resets.delete_many({"email": user.get("email")})
     await db.users.delete_one({"user_id": uid})
     # Sessions last, so this request itself stays authenticated to the end.
@@ -1312,6 +1314,19 @@ api.include_router(
 api.include_router(billing.build_router(db, get_current_user, public_user))
 api.include_router(lineages.build_router(db, get_current_user, hidden_user_ids=lambda uid: safety.hidden_user_ids(db, uid)))
 api.include_router(safety.build_router(db, get_current_user))
+
+
+async def optional_user(authorization: Optional[str] = Header(default=None)) -> Optional[dict]:
+    """The signed-in member if there is one; visitors are allowed through as None."""
+    if not authorization:
+        return None
+    try:
+        return await get_current_user(authorization)
+    except HTTPException:
+        return None
+
+
+api.include_router(analytics.build_router(db, optional_user, get_current_user, safety.is_admin))
 app.include_router(api)
 
 # Origins come from CORS_ORIGINS (comma-separated) in deployed environments.
@@ -1453,6 +1468,9 @@ INDEXES = [
     ("lineage_notes", [("lineage_id", 1), ("created_at", -1)], {}),
     ("password_resets", "email", {}),
     ("password_resets", "expires_at", {"expireAfterSeconds": 0}),
+    ("events", "at", {"expireAfterSeconds": analytics.KEEP_DAYS * 86400}),
+    ("events", [("day", 1), ("name", 1)], {}),
+    ("events", "user_id", {}),
 ]
 
 

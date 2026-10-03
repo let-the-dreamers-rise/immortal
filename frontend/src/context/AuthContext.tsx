@@ -5,6 +5,7 @@ import { getGoogleIdToken, googleSignOut, nativeGoogleAvailable } from "@/src/au
 import * as purchases from "@/src/billing/purchases";
 import { storage } from "@/src/utils/storage";
 import { restoreReminder } from "@/src/utils/reminders";
+import { track } from "@/src/analytics/track";
 
 const TOKEN_KEY = "immortality_session_token";
 // The last profile the server returned, so a phone with no signal (or a
@@ -149,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await startSession(
         await apiFetch<SessionResponse>("/auth/register", { method: "POST", body: { email, password, display_name } })
       );
+      track("signup", { method: "email" });
     },
     [startSession]
   );

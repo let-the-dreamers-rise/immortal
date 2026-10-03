@@ -7,7 +7,7 @@
 // Here the phone holds the steps and the time, the screen stays awake, and
 // the day is counted with or without a word written.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
+import { AppState, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
@@ -23,6 +23,8 @@ import { useAuth } from "@/src/context/AuthContext";
 import { shareApp } from "@/src/utils/share";
 import { MoveFigure } from "@/src/practice/figure/MoveFigure";
 import { moveFor } from "@/src/practice/figure/moves";
+import { StepDetailCard, type StepDetail } from "@/src/practice/StepDetail";
+import { track } from "@/src/analytics/track";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Practice = {
@@ -31,8 +33,15 @@ type Practice = {
   time_min: number;
   seconds?: number;
   instructions: string[];
+  /** Relative length of each step; without it the time is split evenly. */
+  step_weights?: number[];
+  step_details?: StepDetail[];
   safety_note?: string | null;
 };
+
+// A step that itself says how to breathe gets no separate breath cue under
+// the figure, so the two can never disagree.
+const SAYS_HOW_TO_BREATHE = /\b(breathe|breath|breathing|inhale|exhale|in-breath|out-breath)\b/i;
 
 type Growth = { label: string; line: string; days: number; glyph: string };
 
@@ -123,8 +132,13 @@ export default function Session() {
   const canShorten = !!p && !p.seconds && (p.time_min || 0) * 60 > SHORT_SECONDS;
 
   const steps = p?.instructions?.length ? p.instructions : ["Rest the attention on the breath."];
-  const perStep = total / steps.length;
-  const autoStep = Math.min(steps.length - 1, Math.floor(elapsed / perStep));
+  // Each step ends at its share of the total, weighted by how long it takes:
+  // three slow breaths need longer than "rest a palm on the belly".
+  const weights = steps.map((_, i) => Math.max(0.1, p?.step_weights?.[i] ?? 1));
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+  const stepEnds = weights.reduce<number[]>((acc, w) => [...acc, (acc[acc.length - 1] ?? 0) + (w / weightSum) * total], []);
+  const firstOpen = stepEnds.findIndex((end) => elapsed < end);
+  const autoStep = firstOpen === -1 ? steps.length - 1 : firstOpen;
   const step = manualStep !== null ? Math.max(manualStep, autoStep) : autoStep;
   const remaining = total - elapsed;
 
@@ -146,6 +160,7 @@ export default function Session() {
 
   // A gentle tap on each new step, so the eyes can stay closed.
   const lastStep = useRef(0);
+  const [showHow, setShowHow] = useState(false);
   useEffect(() => {
     if (phase === "running" && step !== lastStep.current) {
       tap();
@@ -157,6 +172,14 @@ export default function Session() {
 
   // A spoken close, so someone with closed eyes knows the time is up.
   useEffect(() => {
+    if (phase === "finish") {
+      track("practice_finished", {
+        practice_id: id,
+        seconds: Math.round(banked.current || elapsed),
+        guest: !user,
+        short,
+      });
+    }
     if (phase === "finish" && voice) say("That is the practice. Open your eyes when you are ready.");
     if (phase === "paused" || phase === "saved") Speech.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,6 +197,7 @@ export default function Session() {
   }, [total]);
 
   const start = () => {
+    if (phase === "ready") track("practice_started", { practice_id: id, guest: !user, short });
     if (phase === "ready" && voice) say(steps[step]);
     startedAt.current = Date.now();
     setPhase("running");
@@ -215,6 +239,7 @@ export default function Session() {
       });
       setGrowth(res.growth);
       setPhase("saved");
+      track("day_counted", { from: "session", practice_id: id });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     } catch (e) {
       setSaveErr(errorMessage(e));
@@ -358,15 +383,18 @@ export default function Session() {
 
   const progress = Math.min(1, elapsed / total);
   const move = moveFor(p.practice_id, step);
+  const detail = p.step_details?.[step];
 
   return (
     <View style={styles.container}>
       {top}
-      <View style={styles.body}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.body}>
         {move ? (
           <MoveFigure
             move={move}
             playing={phase !== "paused"}
+            restartKey={`${step}-${phase === "ready" ? "preview" : "live"}`}
+            showCue={!SAYS_HOW_TO_BREATHE.test(steps[step])}
             size={height < 720 ? 120 : 170}
             label={`A figure showing step ${step + 1}`}
           />
@@ -377,12 +405,22 @@ export default function Session() {
         <Txt variant="title" center style={styles.step} testID="session-step">
           {steps[step]}
         </Txt>
+        {detail ? (
+          <View style={{ alignSelf: "stretch", alignItems: "center", marginTop: spacing.md }}>
+            <Chip label={showHow ? "Hide how" : "How to do it"} active={showHow} onPress={() => setShowHow(!showHow)} testID="session-how" />
+            {showHow ? (
+              <View style={{ alignSelf: "stretch", marginTop: spacing.md, maxWidth: 480, width: "100%" }}>
+                <StepDetailCard detail={detail} />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
         {phase === "ready" && p.safety_note ? (
           <Txt variant="caption" center color={colors.warning} style={{ marginTop: spacing.lg, maxWidth: 320 }}>
             {p.safety_note}
           </Txt>
         ) : null}
-      </View>
+      </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.xl }]}>
         <Txt style={styles.clock} testID="session-clock">{clock(remaining)}</Txt>
@@ -451,7 +489,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.md,
   },
-  body: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl },
+  body: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
   step: { marginTop: spacing.md, fontSize: 24, lineHeight: 34, maxWidth: 420 },
   footer: { paddingHorizontal: spacing.xl, alignItems: "stretch" },
   clock: {

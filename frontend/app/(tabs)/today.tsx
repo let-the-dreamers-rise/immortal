@@ -10,6 +10,7 @@ import { notify } from "@/src/utils/feedback";
 import { useAuth } from "@/src/context/AuthContext";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 import { LineageActivity } from "@/src/lineages/LineageActivity";
+import { track } from "@/src/analytics/track";
 import type { LineageActivity as Activity } from "@/src/lineages/types";
 import { lineageNudgesFor, restoreReminder, setLineageNudges } from "@/src/utils/reminders";
 
@@ -104,6 +105,7 @@ export default function TodayScreen() {
     setMarking(true);
     try {
       await apiFetch("/logs", { method: "POST", body: { body: "", nothing_happened: true, visibility: "private" } });
+      track("day_counted", { from: "today" });
       await load();
     } catch (e) {
       notify("Today was not counted", errorMessage(e));

@@ -30,12 +30,14 @@ MICRO_PRACTICES = [
     # ---------------- DAO ----------------
     {
         "practice_id": "micro-kou-chi",
+        # Thirty-six unhurried taps need most of the minute.
+        "step_weights": [0.4, 1, 3.4, 0.6],
         "title": "Kou Chi — Tapping the Teeth",
         "tradition": "dao",
         "category": "Micro",
         "difficulty": "beginner",
         "time_min": 1,
-        "seconds": 40,
+        "seconds": 60,
         "cue": "In a queue, or anywhere you cannot be seen to be doing anything",
         "discreet": True,
         "origin_text": "Ge Hong, Baopuzi (318 CE); Sun Simiao, Qianjin Fang (652 CE)",
@@ -59,6 +61,7 @@ MICRO_PRACTICES = [
     },
     {
         "practice_id": "micro-yan-jin",
+        "step_weights": [1.5, 1.5, 1, 1],
         "title": "Yan Jin — Swallowing the Jade Fluid",
         "tradition": "dao",
         "category": "Micro",
@@ -89,6 +92,8 @@ MICRO_PRACTICES = [
     },
     {
         "practice_id": "micro-laogong",
+        # About twenty seconds of rubbing.
+        "step_weights": [0.5, 2, 0.6, 1],
         "title": "Warming the Palms — Laogong",
         "tradition": "dao",
         "category": "Micro",
@@ -118,6 +123,8 @@ MICRO_PRACTICES = [
     },
     {
         "practice_id": "micro-eye-rest",
+        # Five slow breaths under the palms, then twenty seconds of distance.
+        "step_weights": [0.6, 0.6, 2, 1.6],
         "title": "Palming and the Distant Gaze",
         "tradition": "dao",
         "category": "Micro",
@@ -151,6 +158,7 @@ MICRO_PRACTICES = [
     },
     {
         "practice_id": "micro-wise-owl",
+        "step_weights": [0.6, 1, 1, 2],
         "title": "Wise Owl, Seated",
         "tradition": "dao",
         "category": "Micro",
@@ -182,6 +190,8 @@ MICRO_PRACTICES = [
     },
     {
         "practice_id": "micro-dantian-breaths",
+        # The three breaths are the practice; the first steps only set it up.
+        "step_weights": [0.5, 0.5, 0.5, 3],
         "title": "Three Breaths to the Lower Dantian",
         "tradition": "dao",
         "category": "Micro",

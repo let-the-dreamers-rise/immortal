@@ -1,6 +1,6 @@
-# Privacy Policy — Immortal
+﻿# Privacy Policy — Immortal
 
-**Last updated: 18 September 2026**
+**Last updated: 3 October 2026**
 
 This policy explains what Immortal collects, why, who else can see it, and how to get it back or get rid of it. It describes what the app actually does, not what apps in general do.
 
@@ -47,6 +47,7 @@ Questions, requests, or complaints: **ashwingoyal2006@gmail.com**.
 | Session token | Keeps you signed in | 30 days, then it expires and is deleted |
 | Days practised, and the growth stage derived from them | Computed from your entries and shown on your profile | While your account exists |
 | Your device's time zone | Sent with each request so a day of practice is your day, not the server's. Used to date your entries and discarded; it is not stored | Not stored |
+| Usage events: opening the app, starting and finishing a practice, counting a day, creating an account, taking up a lineage, sharing an invitation, and error reports from the app. Each carries a random ID for your device, your account ID if you are signed in, the practice or lineage involved, and your device type. They never include anything you write | To see whether the app helps people keep practising, and to find and fix crashes. They stay on our own server and are never sent to an analytics company | 400 days, then automatically deleted. Events tied to your account are deleted at once with it |
 | **IP address**, on sign-in and registration attempts | To rate-limit brute-force and credential-stuffing attacks. This is a security measure and nothing else | **Automatically deleted after 5 minutes** |
 
 ### Device location
@@ -129,6 +130,7 @@ Our infrastructure providers operate in multiple countries, so your data may be 
 | Deleted journal entries | Marked deleted and hidden immediately; purged from backups within 30 days |
 | Session tokens | 30 days, then automatically deleted |
 | Sign-in attempt records with IP | 5 minutes, then automatically deleted |
+| Usage events and error reports | 400 days, then automatically deleted; those tied to your account at once if you delete it |
 | Reports you sent, and blocks | Until you delete your account. Reports about content are kept with the moderation record after they are resolved |
 | Backups | Rolling, overwritten within 30 days |
 

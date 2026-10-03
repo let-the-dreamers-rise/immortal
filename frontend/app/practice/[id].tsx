@@ -9,6 +9,7 @@ import { CaretLeft, Warning, Clock, Barbell } from "@/src/components/icons";
 import { Button, ErrorState, Loading, Txt } from "@/src/components/ui";
 import { apiFetch, errorMessage, mediaUri } from "@/src/api/client";
 import { goBack } from "@/src/utils/navigation";
+import { StepDetailCard, type StepDetail } from "@/src/practice/StepDetail";
 import { colors, fonts, radius, spacing } from "@/src/theme";
 
 type Practice = {
@@ -24,6 +25,7 @@ type Practice = {
   modern_understanding: string;
   evidence_note?: string | null;
   instructions: string[];
+  step_details?: StepDetail[];
   safety_note?: string | null;
   illustration_url: string;
   has_illustration: boolean;
@@ -135,9 +137,16 @@ export default function PracticeDetail() {
 
           <Section label="How to practise">
             {p.instructions.map((step, i) => (
-              <View key={i} style={styles.step}>
-                <Txt style={{ fontFamily: fonts.display, fontSize: 22, color: colors.brandPrimary, width: 28 }}>{i + 1}</Txt>
-                <Txt variant="body" style={{ flex: 1 }}>{step}</Txt>
+              <View key={i} style={{ marginBottom: spacing.md }}>
+                <View style={[styles.step, { marginBottom: 0 }]}>
+                  <Txt style={{ fontFamily: fonts.display, fontSize: 22, color: colors.brandPrimary, width: 28 }}>{i + 1}</Txt>
+                  <Txt variant="body" style={{ flex: 1 }}>{step}</Txt>
+                </View>
+                {p.step_details?.[i] ? (
+                  <View style={{ marginTop: spacing.sm, marginLeft: 28 + spacing.sm }}>
+                    <StepDetailCard detail={p.step_details[i]} compact />
+                  </View>
+                ) : null}
               </View>
             ))}
           </Section>

@@ -54,6 +54,68 @@ PRACTICES = [
             "7. Clench the Fists and Glare — from horse stance, punch with focused eyes to build strength and qi.",
             "8. Bounce on the Heels Seven Times — rise on the toes and drop, 'to dispel a hundred ailments'.",
         ],
+        # How long each movement takes relative to the others; the session
+        # timer divides the time by these instead of evenly.
+        "step_weights": [1, 1.2, 1, 0.8, 1, 1, 1, 0.6],
+        # One card per movement: enough to learn it from the phone.
+        "step_details": [
+            {
+                "start": "Feet hip-width apart, knees soft. Interlace the fingers in front of the lower belly, palms up.",
+                "move": "Lift the hands up the front of the body. At chest height turn the palms over and push them up overhead, eyes following the hands, then look ahead and stretch. Unlace the hands and float them down out to the sides.",
+                "breath": "In as the hands rise, out as they come down.",
+                "times": "6 times",
+                "watch": "Don't arch the lower back or lift the shoulders. The stretch is up through the sides, not back.",
+            },
+            {
+                "start": "Step the left foot out into a wide horse stance, knees over the toes. Cross the wrists in front of the chest.",
+                "move": "Push the left hand out to the left with the index finger up and thumb out, as the right hand pulls back to the right shoulder like drawing a bowstring. Look past the left index finger. Return and draw to the right.",
+                "breath": "In as you draw the bow, out as you return.",
+                "times": "3 times each side",
+                "watch": "Keep the knees from falling inward, and sit only as low as is comfortable.",
+            },
+            {
+                "start": "Feet hip-width apart, palms up in front of the belly.",
+                "move": "Raise the left hand up the centre line, turn the palm and press it up overhead while the right hand presses down beside the right hip, fingers forward. Bring the hands back together and switch.",
+                "breath": "In as the hands part, out as they return.",
+                "times": "3 times each side",
+                "watch": "Keep the elbows slightly soft and the body upright; don't lean to the side.",
+            },
+            {
+                "start": "Stand tall, arms hanging, palms turned to face behind you.",
+                "move": "Slowly turn the head to look over the left shoulder, keeping the shoulders and hips facing forward. Pause, return to centre, then turn to the right.",
+                "breath": "Out as you turn, in as you come back.",
+                "times": "3 times each side",
+                "watch": "Turn only the head and neck, and only as far as is easy. Never force the neck.",
+            },
+            {
+                "start": "Wide horse stance, hands resting on the thighs, thumbs to the back.",
+                "move": "Shift the weight to the right and lean the upper body down and across in a slow arc from right to left, the tailbone swinging the other way. Come back up through the centre, then circle the other way.",
+                "breath": "Out as you circle down, in as you rise.",
+                "times": "3 times each way",
+                "watch": "If you have high blood pressure or get dizzy, keep the head above the heart and make the circle small.",
+            },
+            {
+                "start": "Feet together, arms raised overhead, palms forward.",
+                "move": "Bring the hands down in front of the chest, slide them under the armpits to the back, then run the palms down the back and legs as you fold forward to the feet. Sweep the hands forward and rise with the arms reaching up.",
+                "breath": "Out as you fold, in as you rise.",
+                "times": "6 times",
+                "watch": "Bend the knees as much as you need. With a back problem or high blood pressure, fold only part way.",
+            },
+            {
+                "start": "Horse stance, fists at the waist, knuckles down.",
+                "move": "Punch the left fist slowly forward, turning it knuckles up, eyes wide and fixed ahead. Open the hand, grip the air, and draw the fist back to the waist. Then the right.",
+                "breath": "Out on the punch, in as the fist returns.",
+                "times": "3 times each side",
+                "watch": "Stay upright and keep the shoulders down; the strength is in the gaze and the grip, not a lean.",
+            },
+            {
+                "start": "Feet together, arms by the sides.",
+                "move": "Rise onto the balls of the feet, crown lifting, and hold for a moment. Let the heels drop lightly to the ground so a gentle shake runs up the body.",
+                "breath": "In as you rise, out as you drop.",
+                "times": "7 times",
+                "watch": "Drop softly if your knees or heels are sore, or skip the drop and simply lower.",
+            },
+        ],
         "safety_note": None,
         "evidence_note": "The best-trialed practice here: a 2017 meta-analysis of randomized trials found benefits for sleep, balance, grip strength, flexibility and blood pressure. All studies test the full eight-form set together.",
     },
