@@ -48,12 +48,12 @@ export default function Welcome() {
       </Txt>
 
       <Button
-        label="Try one minute now"
+        label="Try three breaths now"
         onPress={() => router.push(`/session/${TRY_PRACTICE}`)}
         style={{ marginTop: spacing.xl, alignSelf: "stretch" }}
         testID="welcome-try"
       />
-      <Txt variant="caption" center style={{ marginTop: spacing.sm }}>No account needed. Sit anywhere.</Txt>
+      <Txt variant="caption" center style={{ marginTop: spacing.sm }}>Under a minute. No account needed. Sit anywhere.</Txt>
 
       <View style={{ marginTop: spacing.xxl, alignSelf: "stretch" }}>
         {REASONS.map((r) => (

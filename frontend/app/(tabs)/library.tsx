@@ -180,7 +180,7 @@ export default function LibraryScreen() {
                 {item.time_min > 0 ? (
                   <View style={styles.time}>
                     <Clock size={12} color={colors.muted} weight="regular" />
-                    <Txt variant="caption" style={{ marginLeft: 3 }}>{item.time_min}m</Txt>
+                    <Txt variant="caption" style={{ marginLeft: 3 }}>{item.seconds ? `${item.seconds}s` : `${item.time_min}m`}</Txt>
                   </View>
                 ) : null}
               </View>

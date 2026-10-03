@@ -7,7 +7,7 @@ import { track } from "@/src/analytics/track";
 
 export const APP_URL = "https://immortal-app-14903.web.app";
 
-const TEXT = "Five quiet minutes a day of Chinese Daoist practice, guided step by step. Try one minute, no account needed:";
+const TEXT = "Five quiet minutes a day of Chinese Daoist practice, guided step by step. Try three breaths, no account needed:";
 
 export function shareApp() {
   track("invite_shared", { kind: "app" });

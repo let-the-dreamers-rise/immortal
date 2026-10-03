@@ -14,6 +14,8 @@ import { track } from "@/src/analytics/track";
 import type { LineageActivity as Activity } from "@/src/lineages/types";
 import { lineageNudgesFor, restoreReminder, setLineageNudges } from "@/src/utils/reminders";
 
+const lengthOf = (p: Practice) => p.seconds || (p.time_min || 0) * 60;
+
 // The Today screen exists to answer "what do I do now" before the question is
 // asked. Everything on it is deliberately singular: one suggestion, one
 // smaller alternative, one tree. A dashboard would defeat the point — a
@@ -227,7 +229,7 @@ export default function TodayScreen() {
                     style={styles.alt}
                   >
                     <Txt variant="bodySm" color={colors.onSurfaceSecondary}>
-                      Or something smaller —{" "}
+                      {lengthOf(data.alternative) < lengthOf(data.suggestion) ? "Or something smaller" : "Or instead"} —{" "}
                       <Txt variant="bodySm" color={colors.brandPrimary}>
                         {data.alternative.title}
                       </Txt>

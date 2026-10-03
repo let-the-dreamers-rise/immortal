@@ -129,6 +129,30 @@ class TestSuggestion:
                 assert alt["practice_id"] != sug["practice_id"]
                 assert is_short(alt), f"alternative {alt['title']} is not short"
 
+    def test_alternative_is_shorter_when_anything_shorter_exists(self):
+        from today import length_of
+        shortest = min(length_of(p) for p in PRACTICES if p.get("seconds"))
+        for days in (0, 5, 200):
+            for hour in (5, 8, 12, 16, 19):
+                d = payload(hour=hour, days=days)
+                if length_of(d["suggestion"]) > shortest:
+                    assert length_of(d["alternative"]) < length_of(d["suggestion"]), (days, hour)
+
+    def test_night_alternative_also_settles(self):
+        for days in (0, 5, 200):
+            assert payload(hour=22, days=days)["alternative"]["practice_id"] in NIGHT_SAFE
+
+    def test_newcomer_is_not_offered_a_follow_on_practice(self):
+        from today import FOLLOWS_ANOTHER
+        for day in range(18, 30):
+            for hour in (5, 8, 12, 16, 19, 22):
+                d = build_today(
+                    now=datetime(2026, 9, day, hour, tzinfo=timezone.utc), practices=PRACTICES,
+                    stage_practice_ids=STAGE_IDS, total_days=0, logged_today=False, stage_title=None,
+                )
+                assert d["suggestion"]["practice_id"] not in FOLLOWS_ANOTHER
+                assert d["alternative"]["practice_id"] not in FOLLOWS_ANOTHER
+
     def test_suggestion_rotates_across_days(self):
         """The same practice every morning becomes wallpaper."""
         seen = {

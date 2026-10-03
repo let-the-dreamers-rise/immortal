@@ -126,6 +126,16 @@ NIGHT_SAFE = {
 }
 
 
+# Practices written as the second half of another (Yan Jin follows Kou Chi).
+# Fine once someone knows the first one, confusing as a newcomer's suggestion.
+FOLLOWS_ANOTHER = {"micro-yan-jin"}
+
+
+def length_of(p: dict) -> int:
+    """Seconds a practice takes, for comparing sizes."""
+    return p.get("seconds") or (p.get("time_min") or 0) * 60
+
+
 # Days of practice below which the stage curriculum is never suggested. A
 # twenty-minute set is the right ask for someone established and the wrong one
 # for someone on day one — which is the whole reason the short practices exist.
@@ -167,10 +177,37 @@ def pick_suggestion(
         candidates = pool(kind)
         if phase == "night":
             candidates = [p for p in candidates if p["practice_id"] in NIGHT_SAFE]
+        if total_days < ONRAMP_DAYS:
+            candidates = [p for p in candidates if p["practice_id"] not in FOLLOWS_ANOTHER]
         if candidates:
             candidates.sort(key=lambda p: p["practice_id"])
             return candidates[seed % len(candidates)]
     return None
+
+
+def pick_alternative(
+    phase: str, practices: list, suggestion: dict | None, seed: int, total_days: int = 0
+) -> dict | None:
+    """A second short option: shorter than the suggestion when one exists, never the same one.
+
+    At night it stays among the settling practices, like the suggestion does.
+    """
+    smalls = [
+        p for p in practices
+        if (p.get("seconds") or p.get("on_the_go"))
+        and (not suggestion or p["practice_id"] != suggestion["practice_id"])
+    ]
+    if phase == "night":
+        smalls = [p for p in smalls if p["practice_id"] in NIGHT_SAFE]
+    if total_days < ONRAMP_DAYS:
+        smalls = [p for p in smalls if p["practice_id"] not in FOLLOWS_ANOTHER]
+    if suggestion:
+        shorter = [p for p in smalls if length_of(p) < length_of(suggestion)]
+        smalls = shorter or smalls
+    if not smalls:
+        return None
+    smalls.sort(key=lambda p: p["practice_id"])
+    return smalls[(seed + 3) % len(smalls)]
 
 
 def build_today(
@@ -188,13 +225,7 @@ def build_today(
 
     suggestion = pick_suggestion(ph["phase"], practices, stage_practice_ids, seed, total_days)
     # A second, always-smaller option, so there is a way to say yes on a bad day.
-    smalls = [p for p in practices if p.get("seconds") or p.get("on_the_go")]
-    smalls.sort(key=lambda p: p["practice_id"])
-    alt = None
-    if smalls:
-        alt = smalls[(seed + 3) % len(smalls)]
-        if suggestion and alt["practice_id"] == suggestion["practice_id"]:
-            alt = smalls[(seed + 4) % len(smalls)]
+    alt = pick_alternative(ph["phase"], practices, suggestion, seed, total_days)
 
     return {
         **ph,

@@ -41,7 +41,7 @@ export default function Onboarding() {
         bottomOffset={24}
         keyboardShouldPersistTaps="handled"
       >
-        <Txt variant="caption" color={colors.brandPrimary}>A FEW QUIET QUESTIONS</Txt>
+        <Txt variant="caption" color={colors.brandPrimary}>ONE QUIET QUESTION</Txt>
         <Txt variant="displaySm" style={{ marginTop: spacing.sm }}>
           What draws you to longevity?
         </Txt>

@@ -153,6 +153,8 @@ export default function AuthScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
+          returnKeyType={needsPassword ? "next" : "go"}
+          onSubmitEditing={needsPassword || busy ? undefined : () => { submit(); }}
           testID="auth-email-input"
         />
         {mode === "reset" && (
@@ -172,6 +174,8 @@ export default function AuthScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder={mode === "login" ? "Your password" : `At least ${MIN_PASSWORD} characters`}
+            returnKeyType="go"
+            onSubmitEditing={() => { if (!busy) submit(); }}
             testID="auth-password-input"
           />
         )}

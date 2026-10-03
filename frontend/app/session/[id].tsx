@@ -372,7 +372,7 @@ export default function Session() {
                 testID="session-guest-back"
               />
               <Txt variant="caption" center style={{ marginTop: spacing.md }}>
-                That was the whole practice. An account counts your days and picks the next one for you.
+                Nothing was held back. An account counts your days and picks the next practice for you.
               </Txt>
             </>
           )}
